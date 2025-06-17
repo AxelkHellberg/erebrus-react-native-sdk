@@ -131,6 +131,7 @@ const VPNScreen = () => {
     setConfigFile(configFile)
     setShowQrCodeModal(true)
     setCurrentConfig(vpnConfig)
+    setShowCreateModal(false)
   }
 
   const generateKeys = () => {
@@ -345,88 +346,25 @@ PersistentKeepalive = 16`
     disconnectVPN();
   }, [disconnectVPN]);
 
-  const renderCreateClientModal = () => (
-    <Modal
-      visible={showCreateModal}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={() => setShowCreateModal(false)}
-    >
-      <View style={[styles.modalContainer, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}>
-        <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
-          <ClientCreator
-            apiConfig={{
-              token,
-              gatewayUrl: API_CONFIG.gatewayUrl,
-            }}
-            onClientCreated={handleClientCreated}
-            theme={theme}
-          />
-          <TouchableOpacity
-            style={[styles.closeButton, { backgroundColor: theme.primary }]}
-            onPress={() => setShowCreateModal(false)}
-          >
-            <Text style={styles.closeButtonText}>Close</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  )
-
-  const renderQrCodeModal = () => (
-    <Modal
-      visible={showQrCodeModal}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={() => setShowQrCodeModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>VPN Configuration</Text>
-            <TouchableOpacity onPress={() => setShowQrCodeModal(false)} style={styles.closeButton}>
-              <Text style={[styles.closeButtonText, { color: theme.text }]}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.qrCodeContainer}>
-            {configFile && (
-              <QRCode
-                value={configFile}
-                size={200}
-                backgroundColor={theme.surface}
-                color={theme.text}
-              />
-            )}
-            <Text style={[styles.qrCodeText, { color: theme.textSecondary }]}>
-              Scan this QR code with the WireGuard app or connect directly using the button below.
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.createButton, { backgroundColor: theme.success }]}
-            onPress={handleConnect}
-            disabled={isConnecting || !currentConfig}
-          >
-            <Text style={styles.createButtonText}>Connect Now</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  )
+  console.log('Current token:', token); // Debug log
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       
-      {!token ? (
-        <View style={styles.authContainer}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: theme.text }]}>Erebrus VPN</Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>WireGuard Protocol</Text>
+        </View>
+
+        <View style={styles.authSection}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Authentication</Text>
           <Auth onTokenReceived={setToken} />
         </View>
-      ) : (
-        <>
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.text }]}>Erebrus VPN</Text>
-          </View>
 
+        <View style={styles.vpnSection}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>VPN Status</Text>
           <StatusCard vpnStatus={vpnStatus} theme={theme} />
 
           <View style={styles.actions}>
@@ -445,14 +383,65 @@ PersistentKeepalive = 16`
               <Text style={styles.createButtonText}>Create New Client</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </ScrollView>
 
-          {renderCreateClientModal()}
-          {renderQrCodeModal()}
-        </>
+      {showCreateModal && (
+        <Modal
+          visible={showCreateModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowCreateModal(false)}
+        >
+          <View style={[styles.modalContainer, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}>
+            <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
+              <ClientCreator
+                apiConfig={{
+                  token,
+                  gatewayUrl: API_CONFIG.gatewayUrl,
+                }}
+                onClientCreated={handleClientCreated}
+                theme={theme}
+              />
+              <TouchableOpacity
+                style={[styles.closeButton, { backgroundColor: theme.primary }]}
+                onPress={() => setShowCreateModal(false)}
+              >
+                <Text style={styles.closeButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {showQrCodeModal && configFile && (
+        <Modal
+          visible={showQrCodeModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowQrCodeModal(false)}
+        >
+          <View style={[styles.modalContainer, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}>
+            <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
+              <View style={styles.qrCodeContainer}>
+                <QRCode value={configFile} size={200} backgroundColor={theme.surface} color={theme.text} />
+                <Text style={[styles.qrCodeText, { color: theme.textSecondary }]}>
+                  Scan this QR code with the WireGuard app
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.closeButton, { backgroundColor: theme.primary }]}
+                onPress={() => setShowQrCodeModal(false)}
+              >
+                <Text style={styles.closeButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       )}
     </SafeAreaView>
-  )
-}
+  );
+};
 
 // Root App Component
 const App = () => {
@@ -520,387 +509,87 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
-    alignItems: "center",
-    marginBottom: 30,
-    paddingVertical: 20,
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    borderBottomColor: '#e5e7eb',
   },
   title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    marginBottom: 4,
-    letterSpacing: 0.5,
+    fontSize: 24,
+    fontWeight: 'bold',
   },
   subtitle: {
     fontSize: 16,
-    fontWeight: "500",
-    opacity: 0.7,
-  },
-  statusCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  statusHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 10,
-  },
-  statusTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    letterSpacing: 0.5,
-  },
-  statusDetails: {
-    gap: 8,
-  },
-  statusRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 4,
-  },
-  statusLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  statusValue: {
-    fontSize: 14,
-    fontWeight: "600",
-    fontFamily: "monospace",
-  },
-  controlsCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    marginTop: 4,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 16,
-  },
-  buttonGroup: {
-    gap: 12,
-    marginBottom: 16,
-  },
-  actionButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 48,
-  },
-  primaryButton: {
-    shadowColor: "#10b981",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  secondaryButton: {
-    backgroundColor: "transparent",
-    borderWidth: 2,
-  },
-  utilityButton: {
-    flex: 1,
-    borderWidth: 1,
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-  },
-  secondaryButtonText: {
-    fontWeight: "600",
-  },
-  utilityButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    width: "90%",
-    maxHeight: "80%",
-    borderRadius: 16,
-    padding: 20,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  modalTitle: {
     fontSize: 20,
-    fontWeight: "bold",
-  },
-  closeButton: {
-    width: 30,
-    height: 30,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  closeButtonText: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  createForm: {
-    gap: 16,
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  regionList: {
-    maxHeight: 200,
-  },
-  regionItem: {
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-  },
-  regionText: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  createButton: {
-    padding: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    marginTop: 16,
-  },
-  createButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  qrCodeContainer: {
-    alignItems: "center",
-    marginVertical: 20,
-  },
-  qrCodeText: {
-    fontSize: 14,
-    textAlign: "center",
-    marginTop: 16,
-  },
-  nodeSelector: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  nodeDropdown: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    maxHeight: 300,
-    borderRadius: 8,
-    borderWidth: 1,
-    zIndex: 1000,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  nodeDropdownHeader: {
-    flexDirection: 'row',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  nodeDropdownHeaderText: {
-    flex: 1,
     fontWeight: 'bold',
-    fontSize: 12,
+    marginBottom: 15,
   },
-  nodeList: {
-    maxHeight: 250,
+  authSection: {
+    marginBottom: 30,
   },
-  nodeItem: {
-    flexDirection: 'row',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  nodeItemText: {
-    flex: 1,
-    fontSize: 12,
-  },
-  connectionButtonContainer: {
-    alignItems: 'center',
-    marginVertical: 30,
-  },
-  connectionButton: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  connectionButtonText: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  connectionButtonSubtext: {
-    color: '#ffffff',
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  connectionStatus: {
-    marginTop: 16,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  quickActionsCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginTop: 12,
-  },
-  quickActionButton: {
-    flex: 1,
-    minWidth: '45%',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  quickActionText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  locationCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  locationInfo: {
-    marginTop: 12,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  locationText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  nodeText: {
-    fontSize: 16,
-  },
-  authContainer: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
+  vpnSection: {
+    marginBottom: 30,
   },
   actions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 20,
     marginBottom: 20,
+  },
+  createButton: {
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: '90%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  closeButton: {
+    marginTop: 20,
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  qrCodeContainer: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  qrCodeText: {
+    marginTop: 20,
+    fontSize: 16,
+    textAlign: 'center',
   },
 })
 

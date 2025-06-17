@@ -20,6 +20,7 @@ yarn add erebrus-react-native-sdk
 - Status monitoring
 - Customizable UI components
 - TypeScript support
+- Authentication flow with organization management
 
 ## Usage
 
@@ -38,6 +39,29 @@ const App = () => {
   );
 };
 ```
+
+### Authentication
+
+The SDK now includes an authentication flow that handles organization creation and token generation:
+
+```tsx
+import { Auth } from 'erebrus-react-native-sdk';
+
+const Authentication = () => {
+  const handleTokenReceived = (token: string) => {
+    // Store the token and proceed with VPN setup
+    console.log('Token received:', token);
+  };
+
+  return <Auth onTokenReceived={handleTokenReceived} />;
+};
+```
+
+The Auth component provides:
+- Organization creation
+- API key management
+- Token generation
+- Automatic token refresh
 
 ### Using the Connection Button
 
@@ -73,7 +97,7 @@ const CreateClient = () => {
   return (
     <ClientCreator
       apiConfig={{
-        token: 'your-api-token',
+        token: 'your-api-token', // Token received from Auth component
         gatewayUrl: 'https://gateway.erebrus.io/',
       }}
       onClientCreated={handleClientCreated}
@@ -127,6 +151,15 @@ The main provider component that manages VPN state and functionality.
 
 - `children`: React nodes to be wrapped by the provider
 
+### Auth
+
+The authentication component that handles organization creation and token generation.
+
+#### Props
+
+- `onTokenReceived`: Callback function that receives the generated token
+- `theme`: Optional theme object for customization
+
 ### useVPN Hook
 
 A hook that provides access to VPN functionality.
@@ -161,7 +194,7 @@ A component for creating new VPN clients.
 #### Props
 
 - `apiConfig`: Configuration for the API
-  - `token`: API token
+  - `token`: API token (received from Auth component)
   - `gatewayUrl`: API gateway URL
 - `onClientCreated`: Callback when a client is created
 - `theme`: Optional theme object for customization

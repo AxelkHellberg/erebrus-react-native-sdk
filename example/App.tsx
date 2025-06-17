@@ -32,7 +32,8 @@ import {
   useVPN,
   defaultTheme,
   type VPNConfig,
-} from 'erebrus-react-native-sdk'
+} from '../src'
+import { Auth } from '../src/components/Auth'
 
 interface WireGuardConfig {
   privateKey: string
@@ -94,7 +95,6 @@ const REGIONS: Region[] = [
 
 // API Configuration
 const API_CONFIG = {
-  token: "v4.public.eyJ3YWxsZXRBZGRyZXNzIjoiY0s1aTlkanA5am5mN0Y0bzY4VjhmYVh3OXNiYnFCS1hrRE1zUTFiVzFYRCIsInVzZXJJZCI6ImQ3MGY3ZmMzLWZmYTgtNGQ4My1hYzBmLTMzOTkzMmZjYTgwMCIsInNpZ25lZEJ5IjoiTmV0U2VwaW8iLCJleHAiOiIyMDI4LTAzLTAxVDE0OjE4OjIxLjM5NjE4NTgzMVoifaISaHsqhXxugDcllOoO6c7IeR8JaAeRhc95oFp3ZdWYTzKnHSaJ0NrjLuvTeJjJlHfjNuTfG2Ks17RSGlm_dAg",
   gatewayUrl: "https://gateway.erebrus.io/",
 }
 
@@ -114,6 +114,7 @@ const VPNScreen = () => {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null)
   const [isNodeDropdownOpen, setIsNodeDropdownOpen] = useState(false)
   const [selectedNodeIndex, setSelectedNodeIndex] = useState<number | null>(null)
+  const [token, setToken] = useState<string>("")
 
   // Custom theme based on dark/light mode
   const theme = {
@@ -127,8 +128,9 @@ const VPNScreen = () => {
 
   const handleClientCreated = ({ configFile, vpnConfig }: { configFile: string; vpnConfig: VPNConfig }) => {
     console.log('New client created:', configFile)
-    // You can handle the new client configuration here
-    // For example, save it to storage or connect immediately
+    setConfigFile(configFile)
+    setShowQrCodeModal(true)
+    setCurrentConfig(vpnConfig)
   }
 
   const generateKeys = () => {
@@ -196,7 +198,7 @@ const VPNScreen = () => {
       console.log("Request headers:", {
         Accept: "application/json, text/plain, */*",
         "Content-Type": "application/json",
-        Authorization: `Bearer ${API_CONFIG.token}`,
+        Authorization: `Bearer ${token}`,
       })
 
       const response = await axios.post(
@@ -206,7 +208,7 @@ const VPNScreen = () => {
           headers: {
             Accept: "application/json, text/plain, */*",
             "Content-Type": "application/json",
-            Authorization: `Bearer ${API_CONFIG.token}`,
+            Authorization: `Bearer ${token}`,
           },
         },
       )
@@ -286,7 +288,7 @@ PersistentKeepalive = 16`
     } finally {
       setIsCreatingClient(false)
     }
-  }, [selectedNode])
+  }, [selectedNode, token])
 
   const fetchNodesData = async () => {
     try {
@@ -294,7 +296,7 @@ PersistentKeepalive = 16`
         headers: {
           Accept: "application/json, text/plain, */*",
           "Content-Type": "application/json",
-          Authorization: `Bearer ${API_CONFIG.token}`,
+          Authorization: `Bearer ${token}`,
         },
       })
 
@@ -331,7 +333,17 @@ PersistentKeepalive = 16`
 
   useEffect(() => {
     fetchNodesData()
-  }, [])
+  }, [token])
+
+  const handleConnect = useCallback(() => {
+    if (currentConfig) {
+      connectVPN(currentConfig);
+    }
+  }, [currentConfig, connectVPN]);
+
+  const handleDisconnect = useCallback(() => {
+    disconnectVPN();
+  }, [disconnectVPN]);
 
   const renderCreateClientModal = () => (
     <Modal
@@ -340,145 +352,22 @@ PersistentKeepalive = 16`
       transparent={true}
       onRequestClose={() => setShowCreateModal(false)}
     >
-      <View style={styles.modalOverlay}>
+      <View style={[styles.modalContainer, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}>
         <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Create New VPN Client</Text>
-            <TouchableOpacity onPress={() => setShowCreateModal(false)} style={styles.closeButton}>
-              <Text style={[styles.closeButtonText, { color: theme.text }]}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.createForm}>
-            <Text style={[styles.inputLabel, { color: theme.text }]}>Client Name</Text>
-            <TextInput
-              style={[
-                styles.textInput,
-                {
-                  backgroundColor: theme.background,
-                  borderColor: theme.border,
-                  color: theme.text,
-                },
-              ]}
-              value={newClientName}
-              onChangeText={setNewClientName}
-              placeholder="Enter client name (max 8 chars)"
-              placeholderTextColor={theme.textSecondary}
-              maxLength={8}
-            />
-
-            <Text style={[styles.inputLabel, { color: theme.text }]}>Region</Text>
-            <ScrollView style={styles.regionList} showsVerticalScrollIndicator={false}>
-              {REGIONS.map((region) => (
-                <TouchableOpacity
-                  key={region.id}
-                  style={[
-                    styles.regionItem,
-                    {
-                      backgroundColor: selectedRegion === region.id ? theme.primary : theme.background,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    setSelectedRegion(region.id)
-                    setSelectedNode(null)
-                    setSelectedNodeIndex(null)
-                  }}
-                >
-                  <Text style={[styles.regionText, { color: selectedRegion === region.id ? "#ffffff" : theme.text }]}>
-                    {region.name} ({region.id})
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {selectedRegion && (
-              <>
-                <Text style={[styles.inputLabel, { color: theme.text }]}>Select Node</Text>
-                <TouchableOpacity
-                  style={[
-                    styles.nodeSelector,
-                    {
-                      backgroundColor: theme.background,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                  onPress={() => setIsNodeDropdownOpen(!isNodeDropdownOpen)}
-                >
-                  <Text style={{ color: theme.text }}>
-                    {selectedNode ? (
-                      <>
-                        <Text>{generateSerialNumber(selectedRegion, selectedNodeIndex || 0)}-</Text>
-                        <Text>{sliceNodeId(selectedNode.id)}</Text>
-                      </>
-                    ) : (
-                      "Select Node ID"
-                    )}
-                  </Text>
-                  <Text style={{ color: theme.textSecondary }}>▼</Text>
-                </TouchableOpacity>
-
-                {isNodeDropdownOpen && (
-                  <View style={[styles.nodeDropdown, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                    <View style={styles.nodeDropdownHeader}>
-                      <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>S.No</Text>
-                      <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>Node ID</Text>
-                      <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>Wallet</Text>
-                      <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>Chain</Text>
-                    </View>
-                    <ScrollView style={styles.nodeList}>
-                      {activeNodesData
-                        .filter((node) => node.region === selectedRegion)
-                        .map((node, index) => (
-                          <TouchableOpacity
-                            key={node.id}
-                            style={[
-                              styles.nodeItem,
-                              {
-                                backgroundColor: selectedNode?.id === node.id ? theme.primary : theme.background,
-                                borderColor: theme.border,
-                              },
-                            ]}
-                            onPress={() => {
-                              setSelectedNode(node)
-                              setSelectedNodeIndex(index)
-                              setIsNodeDropdownOpen(false)
-                            }}
-                          >
-                            <Text style={[styles.nodeItemText, { color: theme.text }]}>
-                              {generateSerialNumber(selectedRegion, index)}
-                            </Text>
-                            <Text style={[styles.nodeItemText, { color: theme.text }]}>{sliceNodeId(node.id)}</Text>
-                            <Text style={[styles.nodeItemText, { color: theme.text }]}>
-                              {sliceWalletAddress(node.walletAddress)}
-                            </Text>
-                            <Text style={[styles.nodeItemText, { color: theme.text }]}>{node.chainName}</Text>
-                          </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                  </View>
-                )}
-              </>
-            )}
-
-            <TouchableOpacity
-              style={[
-                styles.createButton,
-                {
-                  backgroundColor: theme.primary,
-                  opacity: !newClientName || !selectedRegion || !selectedNode || isCreatingClient ? 0.5 : 1,
-                },
-              ]}
-              onPress={() => createVPNClient(newClientName, selectedRegion)}
-              disabled={!newClientName || !selectedRegion || !selectedNode || isCreatingClient}
-            >
-              {isCreatingClient ? (
-                <ActivityIndicator color="#ffffff" size="small" />
-              ) : (
-                <Text style={styles.createButtonText}>Create Client</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+          <ClientCreator
+            apiConfig={{
+              token,
+              gatewayUrl: API_CONFIG.gatewayUrl,
+            }}
+            onClientCreated={handleClientCreated}
+            theme={theme}
+          />
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: theme.primary }]}
+            onPress={() => setShowCreateModal(false)}
+          >
+            <Text style={styles.closeButtonText}>Close</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -514,7 +403,7 @@ PersistentKeepalive = 16`
           </View>
           <TouchableOpacity
             style={[styles.createButton, { backgroundColor: theme.success }]}
-            onPress={connectVPN}
+            onPress={handleConnect}
             disabled={isConnecting || !currentConfig}
           >
             <Text style={styles.createButtonText}>Connect Now</Text>
@@ -526,38 +415,41 @@ PersistentKeepalive = 16`
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.text }]}>Erebrus VPN</Text>
-          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>WireGuard Protocol</Text>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+      
+      {!token ? (
+        <View style={styles.authContainer}>
+          <Auth onTokenReceived={setToken} />
         </View>
+      ) : (
+        <>
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: theme.text }]}>Erebrus VPN</Text>
+          </View>
 
-        <StatusCard vpnStatus={vpnStatus} theme={theme} />
-        
-        <ConnectionButton
-          isConnected={vpnStatus?.isConnected || false}
-          isConnecting={isConnecting}
-          isDisconnecting={isDisconnecting}
-          onConnect={connectVPN}
-          onDisconnect={disconnectVPN}
-          theme={theme}
-        />
+          <StatusCard vpnStatus={vpnStatus} theme={theme} />
 
-        <ClientCreator
-          apiConfig={API_CONFIG}
-          onClientCreated={handleClientCreated}
-          theme={theme}
-        />
-      </ScrollView>
+          <View style={styles.actions}>
+            <ConnectionButton
+              isConnected={vpnStatus?.isConnected || false}
+              isConnecting={isConnecting}
+              isDisconnecting={isDisconnecting}
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+              theme={theme}
+            />
+            <TouchableOpacity
+              style={[styles.createButton, { backgroundColor: theme.primary }]}
+              onPress={() => setShowCreateModal(true)}
+            >
+              <Text style={styles.createButtonText}>Create New Client</Text>
+            </TouchableOpacity>
+          </View>
 
-      {renderCreateClientModal()}
-      {renderQrCodeModal()}
+          {renderCreateClientModal()}
+          {renderQrCodeModal()}
+        </>
+      )}
     </SafeAreaView>
   )
 }
@@ -992,6 +884,23 @@ const styles = StyleSheet.create({
   },
   nodeText: {
     fontSize: 16,
+  },
+  authContainer: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
 })
 

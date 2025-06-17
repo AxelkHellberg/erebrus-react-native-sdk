@@ -13,6 +13,7 @@ import axios from 'axios';
 import CryptoJS from 'crypto-js';
 import { generateKeyPair } from 'curve25519-js';
 import QRCode from 'react-native-qrcode-svg';
+import { Auth } from './Auth';
 
 interface Node {
   id: string;
@@ -89,6 +90,11 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
   const [selectedNodeIndex, setSelectedNodeIndex] = useState<number | null>(null);
   const [showQrCode, setShowQrCode] = useState(false);
   const [configFile, setConfigFile] = useState('');
+  const [token, setToken] = useState(apiConfig.token);
+
+  const handleTokenReceived = (newToken: string) => {
+    setToken(newToken);
+  };
 
   const generateKeys = () => {
     try {
@@ -121,12 +127,17 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
   };
 
   const fetchNodesData = useCallback(async () => {
+    if (!token) {
+      Alert.alert('Error', 'Please authenticate first');
+      return;
+    }
+
     try {
       const response = await axios.get(`${apiConfig.gatewayUrl}api/v1.0/nodes/all`, {
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiConfig.token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -142,9 +153,14 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
       console.error('Error fetching nodes data:', error);
       Alert.alert('Error', 'Failed to fetch available nodes');
     }
-  }, [apiConfig]);
+  }, [apiConfig, token]);
 
   const createVPNClient = useCallback(async () => {
+    if (!token) {
+      Alert.alert('Error', 'Please authenticate first');
+      return;
+    }
+
     if (!selectedNode) {
       Alert.alert('Error', 'Please select a node first');
       return;
@@ -167,7 +183,7 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
           headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiConfig.token}`,
+            Authorization: `Bearer ${token}`,
           },
         },
       );
@@ -220,7 +236,7 @@ PersistentKeepalive = 16`;
     } finally {
       setIsCreatingClient(false);
     }
-  }, [selectedNode, newClientName, apiConfig, onClientCreated]);
+  }, [apiConfig, token, selectedNode, newClientName, onClientCreated]);
 
   React.useEffect(() => {
     fetchNodesData();
@@ -240,161 +256,168 @@ PersistentKeepalive = 16`;
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.surface }]}>
-      <Text style={[styles.title, { color: theme.text }]}>Create New VPN Client</Text>
-
-      <View style={styles.form}>
-        <Text style={[styles.label, { color: theme.text }]}>Client Name</Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.background,
-              borderColor: theme.border,
-              color: theme.text,
-            },
-          ]}
-          value={newClientName}
-          onChangeText={setNewClientName}
-          placeholder="Enter client name (max 8 chars)"
-          placeholderTextColor={theme.textSecondary}
-          maxLength={8}
-        />
-
-        <Text style={[styles.label, { color: theme.text }]}>Region</Text>
-        <ScrollView style={styles.regionList} showsVerticalScrollIndicator={false}>
-          {REGIONS.map((region) => (
-            <TouchableOpacity
-              key={region.id}
-              style={[
-                styles.regionItem,
-                {
-                  backgroundColor: selectedRegion === region.id ? theme.primary : theme.background,
-                  borderColor: theme.border,
-                },
-              ]}
-              onPress={() => {
-                setSelectedRegion(region.id);
-                setSelectedNode(null);
-                setSelectedNodeIndex(null);
-              }}
-            >
-              <Text
+    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+      {!token ? (
+        <Auth onTokenReceived={handleTokenReceived} />
+      ) : (
+        <>
+          <View style={[styles.section, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Create New Client</Text>
+            <View style={styles.form}>
+              <Text style={[styles.label, { color: theme.text }]}>Client Name</Text>
+              <TextInput
                 style={[
-                  styles.regionText,
-                  { color: selectedRegion === region.id ? '#ffffff' : theme.text },
+                  styles.input,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                    color: theme.text,
+                  },
                 ]}
-              >
-                {region.name} ({region.id})
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+                value={newClientName}
+                onChangeText={setNewClientName}
+                placeholder="Enter client name (max 8 chars)"
+                placeholderTextColor={theme.textSecondary}
+                maxLength={8}
+              />
 
-        {selectedRegion && (
-          <>
-            <Text style={[styles.label, { color: theme.text }]}>Select Node</Text>
-            <TouchableOpacity
-              style={[
-                styles.nodeSelector,
-                {
-                  backgroundColor: theme.background,
-                  borderColor: theme.border,
-                },
-              ]}
-              onPress={() => setIsNodeDropdownOpen(!isNodeDropdownOpen)}
-            >
-              <Text style={{ color: theme.text }}>
-                {selectedNode ? (
-                  <>
-                    <Text>{generateSerialNumber(selectedRegion, selectedNodeIndex || 0)}-</Text>
-                    <Text>{sliceNodeId(selectedNode.id)}</Text>
-                  </>
+              <Text style={[styles.label, { color: theme.text }]}>Region</Text>
+              <ScrollView style={styles.regionList} showsVerticalScrollIndicator={false}>
+                {REGIONS.map((region) => (
+                  <TouchableOpacity
+                    key={region.id}
+                    style={[
+                      styles.regionItem,
+                      {
+                        backgroundColor: selectedRegion === region.id ? theme.primary : theme.background,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      setSelectedRegion(region.id);
+                      setSelectedNode(null);
+                      setSelectedNodeIndex(null);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.regionText,
+                        { color: selectedRegion === region.id ? '#ffffff' : theme.text },
+                      ]}
+                    >
+                      {region.name} ({region.id})
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {selectedRegion && (
+                <>
+                  <Text style={[styles.label, { color: theme.text }]}>Select Node</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.nodeSelector,
+                      {
+                        backgroundColor: theme.background,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                    onPress={() => setIsNodeDropdownOpen(!isNodeDropdownOpen)}
+                  >
+                    <Text style={{ color: theme.text }}>
+                      {selectedNode ? (
+                        <>
+                          <Text>{generateSerialNumber(selectedRegion, selectedNodeIndex || 0)}-</Text>
+                          <Text>{sliceNodeId(selectedNode.id)}</Text>
+                        </>
+                      ) : (
+                        'Select Node ID'
+                      )}
+                    </Text>
+                    <Text style={{ color: theme.textSecondary }}>▼</Text>
+                  </TouchableOpacity>
+
+                  {isNodeDropdownOpen && (
+                    <View
+                      style={[
+                        styles.nodeDropdown,
+                        { backgroundColor: theme.surface, borderColor: theme.border },
+                      ]}
+                    >
+                      <View style={styles.nodeDropdownHeader}>
+                        <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>S.No</Text>
+                        <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>Node ID</Text>
+                        <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>Wallet</Text>
+                        <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>Chain</Text>
+                      </View>
+                      <ScrollView style={styles.nodeList}>
+                        {nodesData
+                          .filter((node) => node.region === selectedRegion)
+                          .map((node, index) => (
+                            <TouchableOpacity
+                              key={node.id}
+                              style={[
+                                styles.nodeItem,
+                                {
+                                  backgroundColor: selectedNode?.id === node.id ? theme.primary : theme.background,
+                                  borderColor: theme.border,
+                                },
+                              ]}
+                              onPress={() => {
+                                setSelectedNode(node);
+                                setSelectedNodeIndex(index);
+                                setIsNodeDropdownOpen(false);
+                              }}
+                            >
+                              <Text style={[styles.nodeItemText, { color: theme.text }]}>
+                                {generateSerialNumber(selectedRegion, index)}
+                              </Text>
+                              <Text style={[styles.nodeItemText, { color: theme.text }]}>
+                                {sliceNodeId(node.id)}
+                              </Text>
+                              <Text style={[styles.nodeItemText, { color: theme.text }]}>
+                                {sliceWalletAddress(node.walletAddress)}
+                              </Text>
+                              <Text style={[styles.nodeItemText, { color: theme.text }]}>{node.chainName}</Text>
+                            </TouchableOpacity>
+                          ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.createButton,
+                  {
+                    backgroundColor: theme.primary,
+                    opacity: !newClientName || !selectedRegion || !selectedNode || isCreatingClient ? 0.5 : 1,
+                  },
+                ]}
+                onPress={createVPNClient}
+                disabled={!newClientName || !selectedRegion || !selectedNode || isCreatingClient}
+              >
+                {isCreatingClient ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
                 ) : (
-                  'Select Node ID'
+                  <Text style={styles.createButtonText}>Create Client</Text>
                 )}
-              </Text>
-              <Text style={{ color: theme.textSecondary }}>▼</Text>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
 
-            {isNodeDropdownOpen && (
-              <View
-                style={[
-                  styles.nodeDropdown,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                ]}
-              >
-                <View style={styles.nodeDropdownHeader}>
-                  <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>S.No</Text>
-                  <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>Node ID</Text>
-                  <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>Wallet</Text>
-                  <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>Chain</Text>
-                </View>
-                <ScrollView style={styles.nodeList}>
-                  {nodesData
-                    .filter((node) => node.region === selectedRegion)
-                    .map((node, index) => (
-                      <TouchableOpacity
-                        key={node.id}
-                        style={[
-                          styles.nodeItem,
-                          {
-                            backgroundColor: selectedNode?.id === node.id ? theme.primary : theme.background,
-                            borderColor: theme.border,
-                          },
-                        ]}
-                        onPress={() => {
-                          setSelectedNode(node);
-                          setSelectedNodeIndex(index);
-                          setIsNodeDropdownOpen(false);
-                        }}
-                      >
-                        <Text style={[styles.nodeItemText, { color: theme.text }]}>
-                          {generateSerialNumber(selectedRegion, index)}
-                        </Text>
-                        <Text style={[styles.nodeItemText, { color: theme.text }]}>
-                          {sliceNodeId(node.id)}
-                        </Text>
-                        <Text style={[styles.nodeItemText, { color: theme.text }]}>
-                          {sliceWalletAddress(node.walletAddress)}
-                        </Text>
-                        <Text style={[styles.nodeItemText, { color: theme.text }]}>{node.chainName}</Text>
-                      </TouchableOpacity>
-                    ))}
-                </ScrollView>
+            {showQrCode && configFile && (
+              <View style={styles.qrCodeContainer}>
+                <QRCode value={configFile} size={200} backgroundColor={theme.surface} color={theme.text} />
+                <Text style={[styles.qrCodeText, { color: theme.textSecondary }]}>
+                  Scan this QR code with the WireGuard app
+                </Text>
               </View>
             )}
-          </>
-        )}
-
-        <TouchableOpacity
-          style={[
-            styles.createButton,
-            {
-              backgroundColor: theme.primary,
-              opacity: !newClientName || !selectedRegion || !selectedNode || isCreatingClient ? 0.5 : 1,
-            },
-          ]}
-          onPress={createVPNClient}
-          disabled={!newClientName || !selectedRegion || !selectedNode || isCreatingClient}
-        >
-          {isCreatingClient ? (
-            <ActivityIndicator color="#ffffff" size="small" />
-          ) : (
-            <Text style={styles.createButtonText}>Create Client</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {showQrCode && configFile && (
-        <View style={styles.qrCodeContainer}>
-          <QRCode value={configFile} size={200} backgroundColor={theme.surface} color={theme.text} />
-          <Text style={[styles.qrCodeText, { color: theme.textSecondary }]}>
-            Scan this QR code with the WireGuard app
-          </Text>
-        </View>
+          </View>
+        </>
       )}
-    </View>
+    </ScrollView>
   );
 };
 
@@ -403,7 +426,11 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 16,
   },
-  title: {
+  section: {
+    padding: 20,
+    borderRadius: 16,
+  },
+  sectionTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,

@@ -2,6 +2,7 @@ export { VPNProvider, useVPN } from './components/VPNProvider';
 export { ClientCreator } from './components/ClientCreator';
 export { ConnectionButton } from './components/ConnectionButton';
 export { StatusCard } from './components/StatusCard';
+export { Auth } from './components/Auth';
 
 export type { WireGuardStatus } from 'react-native-wireguard-vpn';
 

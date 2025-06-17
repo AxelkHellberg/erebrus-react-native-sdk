@@ -32,8 +32,8 @@ import {
   useVPN,
   defaultTheme,
   type VPNConfig,
-} from '../src'
-import { Auth } from '../src/components/Auth'
+  Auth,
+} from 'erebrus-react-native-sdk'
 
 interface WireGuardConfig {
   privateKey: string

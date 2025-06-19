@@ -44,8 +44,6 @@ const crypto_js_1 = __importDefault(require("crypto-js"));
 const curve25519_js_1 = require("curve25519-js");
 const react_native_qrcode_svg_1 = __importDefault(require("react-native-qrcode-svg"));
 const Auth_1 = require("./Auth");
-// @ts-ignore
-const picker_1 = require("@react-native-picker/picker");
 const REGIONS = [
     { id: "SG", name: "Singapore" },
     { id: "IN", name: "India" },
@@ -69,6 +67,8 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
     const [isCreatingClient, setIsCreatingClient] = (0, react_1.useState)(false);
     const [nodesData, setNodesData] = (0, react_1.useState)([]);
     const [selectedNodeId, setSelectedNodeId] = (0, react_1.useState)('');
+    const [selectedNodeName, setSelectedNodeName] = (0, react_1.useState)('');
+    const [showNodeModal, setShowNodeModal] = (0, react_1.useState)(false);
     const [showQrCode, setShowQrCode] = (0, react_1.useState)(false);
     const [configFile, setConfigFile] = (0, react_1.useState)('');
     const [token, setToken] = (0, react_1.useState)(apiConfig.token);
@@ -229,27 +229,63 @@ PersistentKeepalive = 16`;
             ]} value={newClientName} onChangeText={setNewClientName} placeholder="Enter client name (max 8 chars)" placeholderTextColor={theme.textSecondary} maxLength={8}/>
 
               <react_native_1.Text style={[styles.label, { color: theme.text }]}>Region</react_native_1.Text>
-              <react_native_1.View style={styles.pickerWrapper}>
-                <picker_1.Picker selectedValue={selectedRegion} onValueChange={(itemValue) => {
-                setSelectedRegion(itemValue);
-                setSelectedNodeId('');
-            }} style={{ color: theme.text }}>
-                  <picker_1.Picker.Item label="Select a region" value=""/>
-                  {REGIONS.map((region) => (<picker_1.Picker.Item key={region.id} label={region.name} value={region.id}/>))}
-                </picker_1.Picker>
-              </react_native_1.View>
+              <react_native_1.ScrollView horizontal style={{ marginBottom: 16 }} showsHorizontalScrollIndicator={false}>
+                {REGIONS.map((region) => (<react_native_1.TouchableOpacity key={region.id} style={[
+                    styles.regionButton,
+                    {
+                        backgroundColor: selectedRegion === region.id ? theme.primary : theme.background,
+                        borderColor: theme.border,
+                    },
+                ]} onPress={() => {
+                    setSelectedRegion(region.id);
+                    setSelectedNodeId('');
+                    setSelectedNodeName('');
+                }}>
+                    <react_native_1.Text style={{ color: selectedRegion === region.id ? '#fff' : theme.text }}>
+                      {region.name}
+                    </react_native_1.Text>
+                  </react_native_1.TouchableOpacity>))}
+              </react_native_1.ScrollView>
 
               <react_native_1.Text style={[styles.label, { color: theme.text }]}>Node</react_native_1.Text>
-              {isLoadingNodes ? (<react_native_1.ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 10 }}/>) : nodesError ? (<react_native_1.Text style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</react_native_1.Text>) : (<react_native_1.View style={styles.pickerWrapper}>
-                  <picker_1.Picker enabled={!!selectedRegion && nodesData.filter((n) => n.region === selectedRegion).length > 0} selectedValue={selectedNodeId} onValueChange={(itemValue) => {
-                    setSelectedNodeId(itemValue);
-                }} style={{ color: theme.text }}>
-                    <picker_1.Picker.Item label="Select a node" value=""/>
-                    {nodesData
-                    .filter((node) => node.region === selectedRegion)
-                    .map((node) => (<picker_1.Picker.Item key={node.id} label={`${node.name || node.id.slice(0, 8)} (${node.chainName})`} value={node.id}/>))}
-                  </picker_1.Picker>
-                </react_native_1.View>)}
+              {isLoadingNodes ? (<react_native_1.ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 10 }}/>) : nodesError ? (<react_native_1.Text style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</react_native_1.Text>) : (<>
+                  <react_native_1.TouchableOpacity style={[
+                    styles.nodeSelectButton,
+                    {
+                        backgroundColor: theme.background,
+                        borderColor: theme.border,
+                    },
+                ]} onPress={() => setShowNodeModal(true)} disabled={!selectedRegion || nodesData.filter((n) => n.region === selectedRegion).length === 0}>
+                    <react_native_1.Text style={{ color: theme.text }}>
+                      {selectedNodeName || 'Select Node'}
+                    </react_native_1.Text>
+                  </react_native_1.TouchableOpacity>
+                  <react_native_1.Modal visible={showNodeModal} animationType="slide" transparent={true} onRequestClose={() => setShowNodeModal(false)}>
+                    <react_native_1.View style={styles.modalOverlay}>
+                      <react_native_1.View style={[styles.modalContent, { backgroundColor: theme.surface }]}> 
+                        <react_native_1.Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 10 }]}>Select Node</react_native_1.Text>
+                        <react_native_1.FlatList data={nodesData.filter((node) => node.region === selectedRegion)} keyExtractor={(item) => item.id} renderItem={({ item }) => (<react_native_1.TouchableOpacity style={[
+                        styles.nodeItem,
+                        {
+                            backgroundColor: selectedNodeId === item.id ? theme.primary : theme.background,
+                            borderColor: theme.border,
+                        },
+                    ]} onPress={() => {
+                        setSelectedNodeId(item.id);
+                        setSelectedNodeName(`${item.name || item.id.slice(0, 8)} (${item.chainName})`);
+                        setShowNodeModal(false);
+                    }}>
+                              <react_native_1.Text style={{ color: selectedNodeId === item.id ? '#fff' : theme.text }}>
+                                {item.name || item.id.slice(0, 8)} ({item.chainName})
+                              </react_native_1.Text>
+                            </react_native_1.TouchableOpacity>)} ListEmptyComponent={<react_native_1.Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 20 }}>No nodes available for this region.</react_native_1.Text>} style={{ maxHeight: 300 }}/>
+                        <react_native_1.TouchableOpacity style={[styles.closeButton, { backgroundColor: theme.primary, marginTop: 20 }]} onPress={() => setShowNodeModal(false)}>
+                          <react_native_1.Text style={{ color: '#fff' }}>Close</react_native_1.Text>
+                        </react_native_1.TouchableOpacity>
+                      </react_native_1.View>
+                    </react_native_1.View>
+                  </react_native_1.Modal>
+                </>)}
 
               <react_native_1.TouchableOpacity style={[
                 styles.createButton,
@@ -327,5 +363,49 @@ const styles = react_native_1.StyleSheet.create({
         fontSize: 14,
         textAlign: 'center',
         marginTop: 16,
+    },
+    regionButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 18,
+        borderRadius: 8,
+        borderWidth: 1,
+        marginRight: 10,
+        marginBottom: 8,
+    },
+    nodeSelectButton: {
+        borderWidth: 1,
+        borderRadius: 8,
+        padding: 14,
+        marginBottom: 16,
+        alignItems: 'center',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        width: '90%',
+        maxWidth: 400,
+        borderRadius: 16,
+        padding: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
+    },
+    nodeItem: {
+        padding: 14,
+        borderRadius: 8,
+        borderWidth: 1,
+        marginBottom: 10,
+        alignItems: 'center',
+    },
+    closeButton: {
+        padding: 12,
+        borderRadius: 8,
+        alignItems: 'center',
     },
 });

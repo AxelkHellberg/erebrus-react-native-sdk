@@ -1,3 +1,4 @@
+import 'react-native-get-random-values';
 import React, { useState, useCallback } from 'react';
 import {
   View,
@@ -12,7 +13,6 @@ import {
   Modal,
 } from 'react-native';
 import axios from 'axios';
-import CryptoJS from 'crypto-js';
 import { generateKeyPair } from 'curve25519-js';
 import QRCode from 'react-native-qrcode-svg';
 import { Auth } from './Auth';
@@ -103,20 +103,17 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
 
   const generateKeys = () => {
     try {
-      const preSharedKey = CryptoJS.lib.WordArray.random(32);
-      const preSharedKeyB64 = preSharedKey.toString(CryptoJS.enc.Base64);
-      const randomBytes = CryptoJS.lib.WordArray.random(32);
-      const randomBytesArray = new Uint8Array(randomBytes.words.length * 4);
-      for (let i = 0; i < randomBytes.words.length; i++) {
-        const word = randomBytes.words[i];
-        randomBytesArray[i * 4] = (word >>> 24) & 0xff;
-        randomBytesArray[i * 4 + 1] = (word >>> 16) & 0xff;
-        randomBytesArray[i * 4 + 2] = (word >>> 8) & 0xff;
-        randomBytesArray[i * 4 + 3] = word & 0xff;
-      }
+      const randomBytesArray = new Uint8Array(32);
+      crypto.getRandomValues(randomBytesArray);
+
       const keyPair = generateKeyPair(randomBytesArray);
       const privKey = Buffer.from(keyPair.private).toString('base64');
       const pubKey = Buffer.from(keyPair.public).toString('base64');
+
+      const preSharedKeyArray = new Uint8Array(32);
+      crypto.getRandomValues(preSharedKeyArray);
+      const preSharedKeyB64 = Buffer.from(preSharedKeyArray).toString('base64');
+
       return {
         preSharedKey: preSharedKeyB64,
         privKey,

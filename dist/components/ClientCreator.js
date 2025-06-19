@@ -37,10 +37,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClientCreator = void 0;
+require("react-native-get-random-values");
 const react_1 = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const axios_1 = __importDefault(require("axios"));
-const crypto_js_1 = __importDefault(require("crypto-js"));
 const curve25519_js_1 = require("curve25519-js");
 const react_native_qrcode_svg_1 = __importDefault(require("react-native-qrcode-svg"));
 const Auth_1 = require("./Auth");
@@ -79,20 +79,14 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
     };
     const generateKeys = () => {
         try {
-            const preSharedKey = crypto_js_1.default.lib.WordArray.random(32);
-            const preSharedKeyB64 = preSharedKey.toString(crypto_js_1.default.enc.Base64);
-            const randomBytes = crypto_js_1.default.lib.WordArray.random(32);
-            const randomBytesArray = new Uint8Array(randomBytes.words.length * 4);
-            for (let i = 0; i < randomBytes.words.length; i++) {
-                const word = randomBytes.words[i];
-                randomBytesArray[i * 4] = (word >>> 24) & 0xff;
-                randomBytesArray[i * 4 + 1] = (word >>> 16) & 0xff;
-                randomBytesArray[i * 4 + 2] = (word >>> 8) & 0xff;
-                randomBytesArray[i * 4 + 3] = word & 0xff;
-            }
+            const randomBytesArray = new Uint8Array(32);
+            crypto.getRandomValues(randomBytesArray);
             const keyPair = (0, curve25519_js_1.generateKeyPair)(randomBytesArray);
             const privKey = Buffer.from(keyPair.private).toString('base64');
             const pubKey = Buffer.from(keyPair.public).toString('base64');
+            const preSharedKeyArray = new Uint8Array(32);
+            crypto.getRandomValues(preSharedKeyArray);
+            const preSharedKeyB64 = Buffer.from(preSharedKeyArray).toString('base64');
             return {
                 preSharedKey: preSharedKeyB64,
                 privKey,

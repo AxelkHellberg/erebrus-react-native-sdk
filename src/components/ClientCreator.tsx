@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  FlatList,
+  Modal,
 } from 'react-native';
 import axios from 'axios';
 import CryptoJS from 'crypto-js';
@@ -15,7 +17,6 @@ import { generateKeyPair } from 'curve25519-js';
 import QRCode from 'react-native-qrcode-svg';
 import { Auth } from './Auth';
 // @ts-ignore
-import { Picker } from '@react-native-picker/picker';
 
 interface Node {
   id: string;
@@ -88,6 +89,8 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
   const [isCreatingClient, setIsCreatingClient] = useState(false);
   const [nodesData, setNodesData] = useState<Node[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState('');
+  const [selectedNodeName, setSelectedNodeName] = useState('');
+  const [showNodeModal, setShowNodeModal] = useState(false);
   const [showQrCode, setShowQrCode] = useState(false);
   const [configFile, setConfigFile] = useState('');
   const [token, setToken] = useState(apiConfig.token);
@@ -264,21 +267,29 @@ PersistentKeepalive = 16`;
               />
 
               <Text style={[styles.label, { color: theme.text }]}>Region</Text>
-              <View style={styles.pickerWrapper}>
-                <Picker
-                  selectedValue={selectedRegion}
-                  onValueChange={(itemValue: string) => {
-                    setSelectedRegion(itemValue);
-                    setSelectedNodeId('');
-                  }}
-                  style={{ color: theme.text }}
-                >
-                  <Picker.Item label="Select a region" value="" />
-                  {REGIONS.map((region) => (
-                    <Picker.Item key={region.id} label={region.name} value={region.id} />
-                  ))}
-                </Picker>
-              </View>
+              <ScrollView horizontal style={{ marginBottom: 16 }} showsHorizontalScrollIndicator={false}>
+                {REGIONS.map((region) => (
+                  <TouchableOpacity
+                    key={region.id}
+                    style={[
+                      styles.regionButton,
+                      {
+                        backgroundColor: selectedRegion === region.id ? theme.primary : theme.background,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      setSelectedRegion(region.id);
+                      setSelectedNodeId('');
+                      setSelectedNodeName('');
+                    }}
+                  >
+                    <Text style={{ color: selectedRegion === region.id ? '#fff' : theme.text }}>
+                      {region.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
 
               <Text style={[styles.label, { color: theme.text }]}>Node</Text>
               {isLoadingNodes ? (
@@ -286,27 +297,67 @@ PersistentKeepalive = 16`;
               ) : nodesError ? (
                 <Text style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</Text>
               ) : (
-                <View style={styles.pickerWrapper}>
-                  <Picker
-                    enabled={!!selectedRegion && nodesData.filter((n) => n.region === selectedRegion).length > 0}
-                    selectedValue={selectedNodeId}
-                    onValueChange={(itemValue: string) => {
-                      setSelectedNodeId(itemValue);
-                    }}
-                    style={{ color: theme.text }}
+                <>
+                  <TouchableOpacity
+                    style={[
+                      styles.nodeSelectButton,
+                      {
+                        backgroundColor: theme.background,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                    onPress={() => setShowNodeModal(true)}
+                    disabled={!selectedRegion || nodesData.filter((n) => n.region === selectedRegion).length === 0}
                   >
-                    <Picker.Item label="Select a node" value="" />
-                    {nodesData
-                      .filter((node) => node.region === selectedRegion)
-                      .map((node) => (
-                        <Picker.Item
-                          key={node.id}
-                          label={`${node.name || node.id.slice(0, 8)} (${node.chainName})`}
-                          value={node.id}
+                    <Text style={{ color: theme.text }}>
+                      {selectedNodeName || 'Select Node'}
+                    </Text>
+                  </TouchableOpacity>
+                  <Modal
+                    visible={showNodeModal}
+                    animationType="slide"
+                    transparent={true}
+                    onRequestClose={() => setShowNodeModal(false)}
+                  >
+                    <View style={styles.modalOverlay}>
+                      <View style={[styles.modalContent, { backgroundColor: theme.surface }]}> 
+                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 10 }]}>Select Node</Text>
+                        <FlatList
+                          data={nodesData.filter((node) => node.region === selectedRegion)}
+                          keyExtractor={(item) => item.id}
+                          renderItem={({ item }) => (
+                            <TouchableOpacity
+                              style={[
+                                styles.nodeItem,
+                                {
+                                  backgroundColor: selectedNodeId === item.id ? theme.primary : theme.background,
+                                  borderColor: theme.border,
+                                },
+                              ]}
+                              onPress={() => {
+                                setSelectedNodeId(item.id);
+                                setSelectedNodeName(`${item.name || item.id.slice(0, 8)} (${item.chainName})`);
+                                setShowNodeModal(false);
+                              }}
+                            >
+                              <Text style={{ color: selectedNodeId === item.id ? '#fff' : theme.text }}>
+                                {item.name || item.id.slice(0, 8)} ({item.chainName})
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                          ListEmptyComponent={<Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 20 }}>No nodes available for this region.</Text>}
+                          style={{ maxHeight: 300 }}
                         />
-                      ))}
-                  </Picker>
-                </View>
+                        <TouchableOpacity
+                          style={[styles.closeButton, { backgroundColor: theme.primary, marginTop: 20 }]}
+                          onPress={() => setShowNodeModal(false)}
+                        >
+                          <Text style={{ color: '#fff' }}>Close</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </Modal>
+                </>
               )}
 
               <TouchableOpacity
@@ -397,5 +448,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 16,
+  },
+  regionButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginRight: 10,
+    marginBottom: 8,
+  },
+  nodeSelectButton: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  nodeItem: {
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  closeButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
   },
 }); 

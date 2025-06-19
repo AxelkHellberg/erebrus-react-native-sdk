@@ -38,6 +38,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClientCreator = void 0;
 require("react-native-get-random-values");
+const buffer_1 = require("buffer");
+if (typeof global.Buffer === 'undefined') {
+    global.Buffer = buffer_1.Buffer;
+}
 const react_1 = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const axios_1 = __importDefault(require("axios"));
@@ -82,11 +86,11 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
             const randomBytesArray = new Uint8Array(32);
             crypto.getRandomValues(randomBytesArray);
             const keyPair = (0, curve25519_js_1.generateKeyPair)(randomBytesArray);
-            const privKey = Buffer.from(keyPair.private).toString('base64');
-            const pubKey = Buffer.from(keyPair.public).toString('base64');
+            const privKey = buffer_1.Buffer.from(keyPair.private).toString('base64');
+            const pubKey = buffer_1.Buffer.from(keyPair.public).toString('base64');
             const preSharedKeyArray = new Uint8Array(32);
             crypto.getRandomValues(preSharedKeyArray);
-            const preSharedKeyB64 = Buffer.from(preSharedKeyArray).toString('base64');
+            const preSharedKeyB64 = buffer_1.Buffer.from(preSharedKeyArray).toString('base64');
             return {
                 preSharedKey: preSharedKeyB64,
                 privKey,

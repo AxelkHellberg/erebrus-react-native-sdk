@@ -155,15 +155,21 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
                 presharedKey: keys.preSharedKey,
                 publicKey: keys.pubKey,
             };
-            const response = await axios_1.default.post(`${apiConfig.gatewayUrl}api/v1.0/erebrus/client/${selectedNode.id}`, requestData, {
+            const url = `${apiConfig.gatewayUrl}api/v1.0/erebrus/client/${selectedNodeId}`;
+            console.log('Token used for client creation:', token);
+            console.log('POST URL:', url);
+            console.log('Request body:', requestData);
+            const response = await fetch(url, {
+                method: 'POST',
                 headers: {
-                    Accept: 'application/json',
+                    Accept: 'application/json, text/plain, */*',
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
+                body: JSON.stringify(requestData),
             });
             if (response.status === 200) {
-                const data = response.data;
+                const data = await response.json();
                 const client = data.payload.client;
                 const configFile = `
 [Interface]
@@ -192,19 +198,16 @@ PersistentKeepalive = 16`;
                 };
                 onClientCreated({ configFile, vpnConfig });
             }
+            else {
+                const errorText = await response.text();
+                console.error('Failed to create VPN client:', errorText);
+                react_native_1.Alert.alert('Error', `Failed to create VPN client: ${errorText}`);
+            }
         }
         catch (error) {
             console.error('Failed to create VPN client:', error);
             let errorMessage = 'Failed to create VPN client: ';
-            if (error.response?.data?.message) {
-                errorMessage += error.response.data.message;
-            }
-            else if (error.response?.data?.error) {
-                errorMessage += error.response.data.error;
-            }
-            else {
-                errorMessage += error.message || 'Unknown error occurred';
-            }
+            errorMessage += error.message || 'Unknown error occurred';
             react_native_1.Alert.alert('Error', errorMessage);
         }
         finally {

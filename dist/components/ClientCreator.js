@@ -45,7 +45,7 @@ const curve25519_js_1 = require("curve25519-js");
 const react_native_qrcode_svg_1 = __importDefault(require("react-native-qrcode-svg"));
 const Auth_1 = require("./Auth");
 // @ts-ignore
-const react_native_2 = require("react-native");
+const picker_1 = require("@react-native-picker/picker");
 const REGIONS = [
     { id: "SG", name: "Singapore" },
     { id: "IN", name: "India" },
@@ -230,25 +230,25 @@ PersistentKeepalive = 16`;
 
               <react_native_1.Text style={[styles.label, { color: theme.text }]}>Region</react_native_1.Text>
               <react_native_1.View style={styles.pickerWrapper}>
-                <react_native_2.Picker selectedValue={selectedRegion} onValueChange={(itemValue) => {
+                <picker_1.Picker selectedValue={selectedRegion} onValueChange={(itemValue) => {
                 setSelectedRegion(itemValue);
                 setSelectedNodeId('');
             }} style={{ color: theme.text }}>
-                  <react_native_2.Picker.Item label="Select a region" value=""/>
-                  {REGIONS.map((region) => (<react_native_2.Picker.Item key={region.id} label={region.name} value={region.id}/>))}
-                </react_native_2.Picker>
+                  <picker_1.Picker.Item label="Select a region" value=""/>
+                  {REGIONS.map((region) => (<picker_1.Picker.Item key={region.id} label={region.name} value={region.id}/>))}
+                </picker_1.Picker>
               </react_native_1.View>
 
               <react_native_1.Text style={[styles.label, { color: theme.text }]}>Node</react_native_1.Text>
               {isLoadingNodes ? (<react_native_1.ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 10 }}/>) : nodesError ? (<react_native_1.Text style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</react_native_1.Text>) : (<react_native_1.View style={styles.pickerWrapper}>
-                  <react_native_2.Picker enabled={!!selectedRegion && nodesData.filter((n) => n.region === selectedRegion).length > 0} selectedValue={selectedNodeId} onValueChange={(itemValue) => {
+                  <picker_1.Picker enabled={!!selectedRegion && nodesData.filter((n) => n.region === selectedRegion).length > 0} selectedValue={selectedNodeId} onValueChange={(itemValue) => {
                     setSelectedNodeId(itemValue);
                 }} style={{ color: theme.text }}>
-                    <react_native_2.Picker.Item label="Select a node" value=""/>
+                    <picker_1.Picker.Item label="Select a node" value=""/>
                     {nodesData
                     .filter((node) => node.region === selectedRegion)
-                    .map((node) => (<react_native_2.Picker.Item key={node.id} label={`${node.name || node.id.slice(0, 8)} (${node.chainName})`} value={node.id}/>))}
-                  </react_native_2.Picker>
+                    .map((node) => (<picker_1.Picker.Item key={node.id} label={`${node.name || node.id.slice(0, 8)} (${node.chainName})`} value={node.id}/>))}
+                  </picker_1.Picker>
                 </react_native_1.View>)}
 
               <react_native_1.TouchableOpacity style={[

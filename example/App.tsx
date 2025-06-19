@@ -21,7 +21,6 @@ import 'react-native-get-random-values'
 import { Buffer } from 'buffer'
 import { generateKeyPair } from 'curve25519-js'
 import CryptoJS from "crypto-js"  
-import { randomBytes } from 'react-native-get-random-values'
 import QRCode from "react-native-qrcode-svg"
 import axios from "axios"
 import {
@@ -95,7 +94,7 @@ const REGIONS: Region[] = [
 
 // API Configuration
 const API_CONFIG = {
-  gatewayUrl: "https://gateway.erebrus.io/",
+  gatewayUrl: "https://gateway.dev.netsepio.com/",
 }
 
 // Main VPN Screen Component
@@ -103,7 +102,7 @@ const VPNScreen = () => {
   const isDarkMode = useColorScheme() === 'dark'
   const { vpnStatus, isConnecting, isDisconnecting, connectVPN, disconnectVPN } = useVPN()
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showQrCodeModal, setShowQrCodeModal] = useState(false)
+  // const [showQrCodeModal, setShowQrCodeModal] = useState(false)
   const [currentConfig, setCurrentConfig] = useState<WireGuardConfig | null>(null)
   const [configFile, setConfigFile] = useState<string>("")
   const [token, setToken] = useState<string>("")
@@ -120,7 +119,7 @@ const VPNScreen = () => {
 
   const handleClientCreated = ({ configFile, vpnConfig }: { configFile: string; vpnConfig: VPNConfig }) => {
     setConfigFile(configFile)
-    setShowQrCodeModal(true)
+    // setShowQrCodeModal(true)
     setCurrentConfig(vpnConfig)
     setShowCreateModal(false)
   }
@@ -202,7 +201,7 @@ const VPNScreen = () => {
         </Modal>
       )}
 
-      {showQrCodeModal && configFile && (
+      {/* {showQrCodeModal && configFile && (
         <Modal
           visible={showQrCodeModal}
           animationType="slide"
@@ -226,7 +225,7 @@ const VPNScreen = () => {
             </View>
           </View>
         </Modal>
-      )}
+      )} */}
     </SafeAreaView>
   );
 };

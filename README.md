@@ -97,7 +97,7 @@ const CreateClient = () => {
     <ClientCreator
       apiConfig={{
         token: 'your-api-token', // Token received from Auth component
-        gatewayUrl: 'https://gateway.erebrus.io/',
+        gatewayUrl: 'https://gateway.dev.netsepio.com/',
       }}
       onClientCreated={handleClientCreated}
       theme={customTheme} // Optional theme customization
@@ -178,7 +178,7 @@ const VPNScreen = () => {
           <ClientCreator
             apiConfig={{
               token,
-              gatewayUrl: 'https://gateway.erebrus.io/',
+              gatewayUrl: 'https://gateway.dev.netsepio.com/',
             }}
             onClientCreated={handleClientCreated}
           />

@@ -15,7 +15,7 @@ import { generateKeyPair } from 'curve25519-js';
 import QRCode from 'react-native-qrcode-svg';
 import { Auth } from './Auth';
 // @ts-ignore
-import { Picker } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 
 interface Node {
   id: string;

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import WireGuardVpnModule, { type WireGuardStatus } from "react-native-wireguard-vpn";
+import WireGuardVpnModule, { type WireGuardStatus } from "react-native-wireguard-vpn-connect";
 import { Alert } from 'react-native';
 
 interface VPNConfig {

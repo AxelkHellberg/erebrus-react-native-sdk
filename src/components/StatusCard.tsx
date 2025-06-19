@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { type WireGuardStatus } from 'react-native-wireguard-vpn';
+import { type WireGuardStatus } from 'react-native-wireguard-vpn-connect';
 
 interface StatusCardProps {
   vpnStatus: WireGuardStatus | null;

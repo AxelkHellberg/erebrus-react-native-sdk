@@ -16,11 +16,11 @@ import {
   TextInput,
   Animated,
 } from "react-native"
-import WireGuardVpnModule, { type WireGuardStatus } from "react-native-wireguard-vpn"
+import WireGuardVpnModule, { type WireGuardStatus } from "react-native-wireguard-vpn-connect"
 import 'react-native-get-random-values'
 import { Buffer } from 'buffer'
 import { generateKeyPair } from 'curve25519-js'
-import CryptoJS from "crypto-js"
+import CryptoJS from "crypto-js"  
 import { randomBytes } from 'react-native-get-random-values'
 import QRCode from "react-native-qrcode-svg"
 import axios from "axios"

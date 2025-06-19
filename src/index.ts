@@ -4,7 +4,7 @@ export { ConnectionButton } from './components/ConnectionButton';
 export { StatusCard } from './components/StatusCard';
 export { Auth } from './components/Auth';
 
-export type { WireGuardStatus } from 'react-native-wireguard-vpn';
+export type { WireGuardStatus } from 'react-native-wireguard-vpn-connect';
 
 export interface VPNConfig {
   privateKey: string;

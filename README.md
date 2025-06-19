@@ -1,8 +1,5 @@
 # erebrus-react-native-sdk
 React Native SDK for implementing Erebrus dVPN in Android and iOS apps
-# Erebrus VPN SDK for React Native
-
-A React Native SDK for integrating Erebrus VPN functionality into your mobile applications.
 
 ## Installation
 
@@ -42,7 +39,7 @@ const App = () => {
 
 ### Authentication
 
-The SDK now includes an authentication flow that handles organization creation and token generation:
+The SDK includes an authentication flow that handles organization creation and token generation:
 
 ```tsx
 import { Auth } from 'erebrus-react-native-sdk';
@@ -78,6 +75,7 @@ const VPNConnection = () => {
       isDisconnecting={isDisconnecting}
       onConnect={connectVPN}
       onDisconnect={disconnectVPN}
+      theme={customTheme} // Optional theme customization
     />
   );
 };
@@ -91,7 +89,8 @@ import { ClientCreator } from 'erebrus-react-native-sdk';
 const CreateClient = () => {
   const handleClientCreated = ({ configFile, vpnConfig }) => {
     console.log('Client created:', configFile);
-    // Handle the new client configuration
+    // The configFile can be used to generate a QR code
+    // The vpnConfig can be used to connect to the VPN
   };
 
   return (
@@ -101,6 +100,7 @@ const CreateClient = () => {
         gatewayUrl: 'https://gateway.erebrus.io/',
       }}
       onClientCreated={handleClientCreated}
+      theme={customTheme} // Optional theme customization
     />
   );
 };
@@ -114,8 +114,92 @@ import { StatusCard, useVPN } from 'erebrus-react-native-sdk';
 const VPNStatus = () => {
   const { vpnStatus } = useVPN();
 
-  return <StatusCard vpnStatus={vpnStatus} />;
+  return (
+    <StatusCard 
+      vpnStatus={vpnStatus} 
+      theme={customTheme} // Optional theme customization
+    />
+  );
 };
+```
+
+### Complete Example
+
+Here's a complete example showing how to use all components together:
+
+```tsx
+import { 
+  VPNProvider, 
+  Auth, 
+  StatusCard, 
+  ConnectionButton, 
+  ClientCreator,
+  useVPN 
+} from 'erebrus-react-native-sdk';
+
+const VPNScreen = () => {
+  const { vpnStatus, isConnecting, isDisconnecting, connectVPN, disconnectVPN } = useVPN();
+  const [token, setToken] = useState("");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showQrCodeModal, setShowQrCodeModal] = useState(false);
+  const [configFile, setConfigFile] = useState("");
+
+  const handleClientCreated = ({ configFile, vpnConfig }) => {
+    setConfigFile(configFile);
+    setShowQrCodeModal(true);
+    setShowCreateModal(false);
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Authentication Section */}
+      <Auth onTokenReceived={setToken} />
+
+      {/* VPN Status Section */}
+      <StatusCard vpnStatus={vpnStatus} />
+
+      {/* Connection Controls */}
+      <ConnectionButton
+        isConnected={vpnStatus?.isConnected || false}
+        isConnecting={isConnecting}
+        isDisconnecting={isDisconnecting}
+        onConnect={connectVPN}
+        onDisconnect={disconnectVPN}
+      />
+
+      {/* Create Client Button */}
+      <TouchableOpacity onPress={() => setShowCreateModal(true)}>
+        <Text>Create New Client</Text>
+      </TouchableOpacity>
+
+      {/* Create Client Modal */}
+      {showCreateModal && (
+        <Modal>
+          <ClientCreator
+            apiConfig={{
+              token,
+              gatewayUrl: 'https://gateway.erebrus.io/',
+            }}
+            onClientCreated={handleClientCreated}
+          />
+        </Modal>
+      )}
+
+      {/* QR Code Modal */}
+      {showQrCodeModal && configFile && (
+        <Modal>
+          <QRCode value={configFile} size={200} />
+        </Modal>
+      )}
+    </SafeAreaView>
+  );
+};
+
+const App = () => (
+  <VPNProvider>
+    <VPNScreen />
+  </VPNProvider>
+);
 ```
 
 ### Customizing the Theme
@@ -197,6 +281,9 @@ A component for creating new VPN clients.
   - `token`: API token (received from Auth component)
   - `gatewayUrl`: API gateway URL
 - `onClientCreated`: Callback when a client is created
+  - Receives `{ configFile, vpnConfig }` object
+  - `configFile`: String containing the WireGuard configuration
+  - `vpnConfig`: Object containing the VPN configuration for connection
 - `theme`: Optional theme object for customization
 
 ### StatusCard

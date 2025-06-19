@@ -29,7 +29,7 @@
     "erebrus-react-native-sdk": "^1.0.2",
     "react-native-get-random-values": "^1.8.0",
     "react-native-qrcode-svg": "^6.2.0",
-    "react-native-wireguard-vpn": "^1.0.0"
+    "react-native-wireguard-vpn-connect": "^1.0.15"
   },
   "devDependencies": {
     "@types/crypto-js": "^4.1.1",

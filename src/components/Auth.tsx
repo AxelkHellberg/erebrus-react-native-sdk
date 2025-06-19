@@ -1,79 +1,42 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 
 interface AuthProps {
   onTokenReceived: (token: string) => void;
 }
 
-interface OrganizationResponse {
-  id: string;
-  name: string;
-  ip_address: string;
-  api_key: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface TokenResponse {
-  status: number;
-  message: string;
-  payload: {
-    OrganisationId: string;
-    Token: string;
-  };
-}
-
 export const Auth: React.FC<AuthProps> = ({ onTokenReceived }) => {
-  const [apiKey, setApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  const createOrganization = async () => {
+  const handleAuth = async () => {
+    setIsLoading(true);
+    setStatus('idle');
     try {
-      setIsLoading(true);
-      const response = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation', {
+      // Step 1: Create organization
+      const orgRes = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
+      if (!orgRes.ok) throw new Error('Failed to create organization');
+      const orgData = await orgRes.json();
+      const apiKey = orgData.api_key;
+      if (!apiKey) throw new Error('No API key returned');
 
-      const data: OrganizationResponse = await response.json();
-      setApiKey(data.api_key);
-      Alert.alert('Success', 'Organization created successfully! API Key: ' + data.api_key);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to create organization');
-      console.error('Error creating organization:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const getToken = async () => {
-    if (!apiKey) {
-      Alert.alert('Error', 'Please create an organization first or enter an API key');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const response = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation/token', {
+      // Step 2: Get token
+      const tokenRes = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation/token', {
         method: 'GET',
-        headers: {
-          'X-API-Key': apiKey,
-        },
+        headers: { 'X-API-Key': apiKey },
       });
+      if (!tokenRes.ok) throw new Error('Failed to generate token');
+      const tokenData = await tokenRes.json();
+      const token = tokenData?.payload?.Token;
+      if (!token) throw new Error('No token returned');
 
-      const data: TokenResponse = await response.json();
-      if (data.status === 200) {
-        onTokenReceived(data.payload.Token);
-        Alert.alert('Success', 'Token generated successfully!');
-      } else {
-        throw new Error(data.message);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to generate token');
-      console.error('Error generating token:', error);
+      setStatus('success');
+      onTokenReceived(token);
+    } catch (e) {
+      setStatus('error');
     } finally {
       setIsLoading(false);
     }
@@ -81,78 +44,50 @@ export const Auth: React.FC<AuthProps> = ({ onTokenReceived }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Authentication</Text>
-      
-      <TouchableOpacity 
-        style={styles.button} 
-        onPress={createOrganization}
+      <TouchableOpacity
+        style={styles.button}
+        onPress={handleAuth}
         disabled={isLoading}
       >
-        <Text style={styles.buttonText}>
-          {isLoading ? 'Creating...' : 'Create New Organization'}
-        </Text>
+        {isLoading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Create Organization & Get Token</Text>
+        )}
       </TouchableOpacity>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Enter API Key"
-        value={apiKey}
-        onChangeText={setApiKey}
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
-
-      <TouchableOpacity 
-        style={styles.button} 
-        onPress={getToken}
-        disabled={isLoading}
-      >
-        <Text style={styles.buttonText}>
-          {isLoading ? 'Generating...' : 'Generate Token'}
-        </Text>
-      </TouchableOpacity>
+      {status === 'success' && <Text style={styles.success}>Token generated!</Text>}
+      {status === 'error' && <Text style={styles.error}>Something went wrong. Try again.</Text>}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 20,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 15,
-    fontSize: 16,
   },
   button: {
     backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 15,
+    padding: 16,
+    borderRadius: 8,
+    minWidth: 220,
+    alignItems: 'center',
+    marginBottom: 16,
   },
   buttonText: {
     color: '#fff',
-    textAlign: 'center',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
+  },
+  success: {
+    color: '#10b981',
+    fontSize: 16,
+    marginTop: 8,
+  },
+  error: {
+    color: '#ef4444',
+    fontSize: 16,
+    marginTop: 8,
   },
 }); 

@@ -104,16 +104,8 @@ const VPNScreen = () => {
   const { vpnStatus, isConnecting, isDisconnecting, connectVPN, disconnectVPN } = useVPN()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showQrCodeModal, setShowQrCodeModal] = useState(false)
-  const [isCreatingClient, setIsCreatingClient] = useState(false)
   const [currentConfig, setCurrentConfig] = useState<WireGuardConfig | null>(null)
-  const [newClientName, setNewClientName] = useState("")
-  const [selectedRegion, setSelectedRegion] = useState("")
   const [configFile, setConfigFile] = useState<string>("")
-  const [nodesData, setNodesData] = useState<Node[]>([])
-  const [activeNodesData, setActiveNodesData] = useState<Node[]>([])
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null)
-  const [isNodeDropdownOpen, setIsNodeDropdownOpen] = useState(false)
-  const [selectedNodeIndex, setSelectedNodeIndex] = useState<number | null>(null)
   const [token, setToken] = useState<string>("")
 
   // Custom theme based on dark/light mode
@@ -127,226 +119,21 @@ const VPNScreen = () => {
   }
 
   const handleClientCreated = ({ configFile, vpnConfig }: { configFile: string; vpnConfig: VPNConfig }) => {
-    console.log('New client created:', configFile)
     setConfigFile(configFile)
     setShowQrCodeModal(true)
     setCurrentConfig(vpnConfig)
     setShowCreateModal(false)
   }
 
-  const generateKeys = () => {
-    try {
-      // Generate pre-shared key using crypto-js
-      const preSharedKey = CryptoJS.lib.WordArray.random(32)
-      const preSharedKeyB64 = preSharedKey.toString(CryptoJS.enc.Base64)
-
-      // Generate key pair using curve25519-js
-      const randomBytes = CryptoJS.lib.WordArray.random(32)
-      const randomBytesArray = new Uint8Array(randomBytes.words.length * 4)
-      for (let i = 0; i < randomBytes.words.length; i++) {
-        const word = randomBytes.words[i]
-        randomBytesArray[i * 4] = (word >>> 24) & 0xff
-        randomBytesArray[i * 4 + 1] = (word >>> 16) & 0xff
-        randomBytesArray[i * 4 + 2] = (word >>> 8) & 0xff
-        randomBytesArray[i * 4 + 3] = word & 0xff
-      }
-
-      const keyPair = generateKeyPair(randomBytesArray)
-      const privKey = Buffer.from(keyPair.private).toString("base64")
-      const pubKey = Buffer.from(keyPair.public).toString("base64")
-
-      return {
-        preSharedKey: preSharedKeyB64,
-        privKey: privKey,
-        pubKey: pubKey,
-      }
-    } catch (error) {
-      console.error("Key generation failed:", error)
-      throw new Error("Failed to generate cryptographic keys")
-    }
-  }
-
-  const createVPNClient = useCallback(async (name: string, region: string) => {
-    if (!selectedNode) {
-      Alert.alert("Error", "Please select a node first")
-      return
-    }
-
-    setIsCreatingClient(true)
-    try {
-      // Log all relevant data
-      console.log("Selected Node:", {
-        id: selectedNode.id,
-        name: selectedNode.name,
-        region: selectedNode.region,
-        status: selectedNode.status,
-        chainName: selectedNode.chainName
-      })
-      console.log("Selected Region:", region)
-      console.log("Client Name:", name)
-
-      const keys = generateKeys()
-
-      // Create request payload
-      const requestData = {
-        name: name,
-        presharedKey: keys.preSharedKey,
-        publicKey: keys.pubKey
-      }
-
-      console.log("Request payload:", requestData)
-      console.log("Request URL:", `${API_CONFIG.gatewayUrl}api/v1.0/erebrus/client/${selectedNode.id}`)
-      console.log("Request headers:", {
-        Accept: "application/json, text/plain, */*",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      })
-
-      const response = await axios.post(
-        `${API_CONFIG.gatewayUrl}api/v1.0/erebrus/client/${selectedNode.id}`,
-        requestData,
-        {
-          headers: {
-            Accept: "application/json, text/plain, */*",
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      if (response.status === 200) {
-        const data = response.data
-        console.log("Client created successfully:", data)
-
-        const client = data.payload.client
-        // Construct WireGuard configuration string
-        const configFile = `
-[Interface]
-Address = ${client.Address[0]}
-PrivateKey = ${keys.privKey}
-DNS = 1.1.1.1
-
-[Peer]
-PublicKey = ${data.payload.serverPublicKey}
-PresharedKey = ${client.PresharedKey}
-AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = ${data.payload.endpoint}:51820
-PersistentKeepalive = 16`
-
-        setConfigFile(configFile)
-        setShowQrCodeModal(true)
-
-        // Construct WireGuardConfig for native module
-        const config: WireGuardConfig = {
-          privateKey: keys.privKey,
-          publicKey: keys.pubKey,
-          serverAddress: data.payload.endpoint,
-          serverPort: 51820,
-          allowedIPs: ["0.0.0.0/0", "::/0"],
-          dns: ["1.1.1.1", "8.8.8.8"],
-          mtu: 1280,
-          presharedKey: client.PresharedKey,
-          persistentKeepalive: 16,
-        }
-
-        setCurrentConfig(config)
-        Alert.alert("Success", `VPN client "${name}" created successfully! You can now connect.`)
-        setShowCreateModal(false)
-        setNewClientName("")
-        setSelectedRegion("")
-        setSelectedNode(null)
-        setSelectedNodeIndex(null)
-      }
-    } catch (error: any) {
-      console.error("Failed to create VPN client:", error)
-      
-      // Enhanced error logging
-      if (error.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
-        console.error("Error response data:", error.response.data)
-        console.error("Error response status:", error.response.status)
-        console.error("Error response headers:", error.response.headers)
-        
-        let errorMessage = "Failed to create VPN client: "
-        if (error.response.data && error.response.data.message) {
-          errorMessage += error.response.data.message
-        } else if (error.response.data && error.response.data.error) {
-          errorMessage += error.response.data.error
-        } else {
-          errorMessage += `Server responded with status ${error.response.status}`
-        }
-        Alert.alert("Error", errorMessage)
-      } else if (error.request) {
-        // The request was made but no response was received
-        console.error("Error request:", error.request)
-        Alert.alert("Error", "No response received from server. Please check your internet connection.")
-      } else {
-        // Something happened in setting up the request that triggered an Error
-        console.error("Error message:", error.message)
-        Alert.alert("Error", "Failed to create VPN client: " + error.message)
-      }
-    } finally {
-      setIsCreatingClient(false)
-    }
-  }, [selectedNode, token])
-
-  const fetchNodesData = async () => {
-    try {
-      const response = await axios.get(`${API_CONFIG.gatewayUrl}api/v1.0/nodes/all`, {
-        headers: {
-          Accept: "application/json, text/plain, */*",
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (response.status === 200) {
-        const payload = response.data.payload
-        setNodesData(payload)
-
-        // Filter only active nodes
-        const filteredNodes = payload.filter(
-          (node: Node) =>
-            node.status === "active" && node.region !== undefined && node.region !== null && node.region.trim(),
-        )
-        setActiveNodesData(filteredNodes)
-        console.log("Active nodes:", filteredNodes)
-      }
-    } catch (error) {
-      console.error("Error fetching nodes data:", error)
-    }
-  }
-
-  // Helper functions for node selection
-  const generateSerialNumber = (region: string, index: number) => {
-    return `${region}-${(index + 1).toString().padStart(3, '0')}`
-  }
-
-  const sliceNodeId = (id: string) => {
-    return id.substring(0, 8) + '...' + id.substring(id.length - 4)
-  }
-
-  const sliceWalletAddress = (address: string) => {
-    if (!address) return "N/A"
-    return address.substring(0, 6) + '...' + address.substring(address.length - 4)
-  }
-
-  useEffect(() => {
-    fetchNodesData()
-  }, [token])
-
   const handleConnect = useCallback(() => {
     if (currentConfig) {
-      connectVPN(currentConfig);
+      connectVPN(currentConfig)
     }
-  }, [currentConfig, connectVPN]);
+  }, [currentConfig, connectVPN])
 
   const handleDisconnect = useCallback(() => {
-    disconnectVPN();
-  }, [disconnectVPN]);
-
-  console.log('Current token:', token); // Debug log
+    disconnectVPN()
+  }, [disconnectVPN])
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -379,6 +166,7 @@ PersistentKeepalive = 16`
             <TouchableOpacity
               style={[styles.createButton, { backgroundColor: theme.primary }]}
               onPress={() => setShowCreateModal(true)}
+              disabled={!token}
             >
               <Text style={styles.createButtonText}>Create New Client</Text>
             </TouchableOpacity>

@@ -38,7 +38,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.VPNProvider = exports.useVPN = void 0;
 const react_1 = __importStar(require("react"));
-const react_native_wireguard_vpn_1 = __importDefault(require("react-native-wireguard-vpn"));
+const react_native_wireguard_vpn_connect_1 = __importDefault(require("react-native-wireguard-vpn-connect"));
 const react_native_1 = require("react-native");
 const VPNContext = (0, react_1.createContext)(undefined);
 const useVPN = () => {
@@ -56,7 +56,7 @@ const VPNProvider = ({ children }) => {
     const [isInitialized, setIsInitialized] = (0, react_1.useState)(false);
     const initializeVPN = (0, react_1.useCallback)(async () => {
         try {
-            await react_native_wireguard_vpn_1.default.initialize();
+            await react_native_wireguard_vpn_connect_1.default.initialize();
             setIsInitialized(true);
             await updateStatus();
         }
@@ -67,7 +67,7 @@ const VPNProvider = ({ children }) => {
     }, []);
     const updateStatus = (0, react_1.useCallback)(async () => {
         try {
-            const status = await react_native_wireguard_vpn_1.default.getStatus();
+            const status = await react_native_wireguard_vpn_connect_1.default.getStatus();
             setVpnStatus(status);
         }
         catch (error) {
@@ -83,7 +83,7 @@ const VPNProvider = ({ children }) => {
             if (!config.privateKey || !config.publicKey) {
                 throw new Error("Invalid cryptographic keys");
             }
-            await react_native_wireguard_vpn_1.default.connect(config);
+            await react_native_wireguard_vpn_connect_1.default.connect(config);
             await updateStatus();
         }
         catch (error) {
@@ -106,7 +106,7 @@ const VPNProvider = ({ children }) => {
             return;
         setIsDisconnecting(true);
         try {
-            await react_native_wireguard_vpn_1.default.disconnect();
+            await react_native_wireguard_vpn_connect_1.default.disconnect();
             await updateStatus();
         }
         catch (error) {

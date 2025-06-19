@@ -37,116 +37,80 @@ exports.Auth = void 0;
 const react_1 = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const Auth = ({ onTokenReceived }) => {
-    const [apiKey, setApiKey] = (0, react_1.useState)('');
     const [isLoading, setIsLoading] = (0, react_1.useState)(false);
-    const createOrganization = async () => {
+    const [status, setStatus] = (0, react_1.useState)('idle');
+    const handleAuth = async () => {
+        setIsLoading(true);
+        setStatus('idle');
         try {
-            setIsLoading(true);
-            const response = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation', {
+            // Step 1: Create organization
+            const orgRes = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
             });
-            const data = await response.json();
-            setApiKey(data.api_key);
-            react_native_1.Alert.alert('Success', 'Organization created successfully! API Key: ' + data.api_key);
-        }
-        catch (error) {
-            react_native_1.Alert.alert('Error', 'Failed to create organization');
-            console.error('Error creating organization:', error);
-        }
-        finally {
-            setIsLoading(false);
-        }
-    };
-    const getToken = async () => {
-        if (!apiKey) {
-            react_native_1.Alert.alert('Error', 'Please create an organization first or enter an API key');
-            return;
-        }
-        try {
-            setIsLoading(true);
-            const response = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation/token', {
+            if (!orgRes.ok)
+                throw new Error('Failed to create organization');
+            const orgData = await orgRes.json();
+            const apiKey = orgData.api_key;
+            if (!apiKey)
+                throw new Error('No API key returned');
+            // Step 2: Get token
+            const tokenRes = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation/token', {
                 method: 'GET',
-                headers: {
-                    'X-API-Key': apiKey,
-                },
+                headers: { 'X-API-Key': apiKey },
             });
-            const data = await response.json();
-            if (data.status === 200) {
-                onTokenReceived(data.payload.Token);
-                react_native_1.Alert.alert('Success', 'Token generated successfully!');
-            }
-            else {
-                throw new Error(data.message);
-            }
+            if (!tokenRes.ok)
+                throw new Error('Failed to generate token');
+            const tokenData = await tokenRes.json();
+            const token = tokenData?.payload?.Token;
+            if (!token)
+                throw new Error('No token returned');
+            setStatus('success');
+            onTokenReceived(token);
         }
-        catch (error) {
-            react_native_1.Alert.alert('Error', 'Failed to generate token');
-            console.error('Error generating token:', error);
+        catch (e) {
+            setStatus('error');
         }
         finally {
             setIsLoading(false);
         }
     };
     return (<react_native_1.View style={styles.container}>
-      <react_native_1.Text style={styles.title}>Authentication</react_native_1.Text>
-      
-      <react_native_1.TouchableOpacity style={styles.button} onPress={createOrganization} disabled={isLoading}>
-        <react_native_1.Text style={styles.buttonText}>
-          {isLoading ? 'Creating...' : 'Create New Organization'}
-        </react_native_1.Text>
+      <react_native_1.TouchableOpacity style={styles.button} onPress={handleAuth} disabled={isLoading}>
+        {isLoading ? (<react_native_1.ActivityIndicator color="#fff"/>) : (<react_native_1.Text style={styles.buttonText}>Create Organization & Get Token</react_native_1.Text>)}
       </react_native_1.TouchableOpacity>
-
-      <react_native_1.TextInput style={styles.input} placeholder="Enter API Key" value={apiKey} onChangeText={setApiKey} autoCapitalize="none" autoCorrect={false}/>
-
-      <react_native_1.TouchableOpacity style={styles.button} onPress={getToken} disabled={isLoading}>
-        <react_native_1.Text style={styles.buttonText}>
-          {isLoading ? 'Generating...' : 'Generate Token'}
-        </react_native_1.Text>
-      </react_native_1.TouchableOpacity>
+      {status === 'success' && <react_native_1.Text style={styles.success}>Token generated!</react_native_1.Text>}
+      {status === 'error' && <react_native_1.Text style={styles.error}>Something went wrong. Try again.</react_native_1.Text>}
     </react_native_1.View>);
 };
 exports.Auth = Auth;
 const styles = react_native_1.StyleSheet.create({
     container: {
+        alignItems: 'center',
+        justifyContent: 'center',
         padding: 20,
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 5,
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 20,
-        textAlign: 'center',
-    },
-    input: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        padding: 10,
-        borderRadius: 5,
-        marginBottom: 15,
-        fontSize: 16,
     },
     button: {
         backgroundColor: '#007AFF',
-        padding: 15,
-        borderRadius: 5,
-        marginBottom: 15,
+        padding: 16,
+        borderRadius: 8,
+        minWidth: 220,
+        alignItems: 'center',
+        marginBottom: 16,
     },
     buttonText: {
         color: '#fff',
-        textAlign: 'center',
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: 'bold',
+    },
+    success: {
+        color: '#10b981',
+        fontSize: 16,
+        marginTop: 8,
+    },
+    error: {
+        color: '#ef4444',
+        fontSize: 16,
+        marginTop: 8,
     },
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { type WireGuardStatus } from "react-native-wireguard-vpn";
+import { type WireGuardStatus } from "react-native-wireguard-vpn-connect";
 interface VPNConfig {
     privateKey: string;
     publicKey: string;

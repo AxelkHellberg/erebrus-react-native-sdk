@@ -39,37 +39,59 @@ const react_native_1 = require("react-native");
 const Auth = ({ onTokenReceived }) => {
     const [isLoading, setIsLoading] = (0, react_1.useState)(false);
     const [status, setStatus] = (0, react_1.useState)('idle');
+    const [errorMsg, setErrorMsg] = (0, react_1.useState)(null);
     const handleAuth = async () => {
         setIsLoading(true);
         setStatus('idle');
+        setErrorMsg(null);
         try {
             // Step 1: Create organization
             const orgRes = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
             });
-            if (!orgRes.ok)
-                throw new Error('Failed to create organization');
             const orgData = await orgRes.json();
+            if (!orgRes.ok) {
+                const msg = orgData?.message || 'Failed to create organization';
+                setErrorMsg(msg);
+                setStatus('error');
+                console.error('Org creation error:', orgData);
+                return;
+            }
             const apiKey = orgData.api_key;
-            if (!apiKey)
-                throw new Error('No API key returned');
+            if (!apiKey) {
+                setErrorMsg('No API key returned');
+                setStatus('error');
+                console.error('No API key in orgData:', orgData);
+                return;
+            }
             // Step 2: Get token
             const tokenRes = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation/token', {
                 method: 'GET',
                 headers: { 'X-API-Key': apiKey },
             });
-            if (!tokenRes.ok)
-                throw new Error('Failed to generate token');
             const tokenData = await tokenRes.json();
+            if (!tokenRes.ok) {
+                const msg = tokenData?.message || 'Failed to generate token';
+                setErrorMsg(msg);
+                setStatus('error');
+                console.error('Token generation error:', tokenData);
+                return;
+            }
             const token = tokenData?.payload?.Token;
-            if (!token)
-                throw new Error('No token returned');
+            if (!token) {
+                setErrorMsg('No token returned');
+                setStatus('error');
+                console.error('No token in tokenData:', tokenData);
+                return;
+            }
             setStatus('success');
             onTokenReceived(token);
         }
         catch (e) {
+            setErrorMsg(e?.message || 'Unknown error');
             setStatus('error');
+            console.error('Auth error:', e);
         }
         finally {
             setIsLoading(false);
@@ -80,7 +102,7 @@ const Auth = ({ onTokenReceived }) => {
         {isLoading ? (<react_native_1.ActivityIndicator color="#fff"/>) : (<react_native_1.Text style={styles.buttonText}>Create Organization & Get Token</react_native_1.Text>)}
       </react_native_1.TouchableOpacity>
       {status === 'success' && <react_native_1.Text style={styles.success}>Token generated!</react_native_1.Text>}
-      {status === 'error' && <react_native_1.Text style={styles.error}>Something went wrong. Try again.</react_native_1.Text>}
+      {status === 'error' && (<react_native_1.Text style={styles.error}>{errorMsg || 'Something went wrong. Try again.'}</react_native_1.Text>)}
     </react_native_1.View>);
 };
 exports.Auth = Auth;

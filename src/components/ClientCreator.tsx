@@ -14,6 +14,8 @@ import CryptoJS from 'crypto-js';
 import { generateKeyPair } from 'curve25519-js';
 import QRCode from 'react-native-qrcode-svg';
 import { Auth } from './Auth';
+// @ts-ignore
+import { Picker } from 'react-native';
 
 interface Node {
   id: string;
@@ -85,12 +87,12 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
   const [selectedRegion, setSelectedRegion] = useState('');
   const [isCreatingClient, setIsCreatingClient] = useState(false);
   const [nodesData, setNodesData] = useState<Node[]>([]);
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [isNodeDropdownOpen, setIsNodeDropdownOpen] = useState(false);
-  const [selectedNodeIndex, setSelectedNodeIndex] = useState<number | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState('');
   const [showQrCode, setShowQrCode] = useState(false);
   const [configFile, setConfigFile] = useState('');
   const [token, setToken] = useState(apiConfig.token);
+  const [isLoadingNodes, setIsLoadingNodes] = useState(false);
+  const [nodesError, setNodesError] = useState<string | null>(null);
 
   const handleTokenReceived = (newToken: string) => {
     setToken(newToken);
@@ -100,7 +102,6 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
     try {
       const preSharedKey = CryptoJS.lib.WordArray.random(32);
       const preSharedKeyB64 = preSharedKey.toString(CryptoJS.enc.Base64);
-
       const randomBytes = CryptoJS.lib.WordArray.random(32);
       const randomBytesArray = new Uint8Array(randomBytes.words.length * 4);
       for (let i = 0; i < randomBytes.words.length; i++) {
@@ -110,11 +111,9 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
         randomBytesArray[i * 4 + 2] = (word >>> 8) & 0xff;
         randomBytesArray[i * 4 + 3] = word & 0xff;
       }
-
       const keyPair = generateKeyPair(randomBytesArray);
       const privKey = Buffer.from(keyPair.private).toString('base64');
       const pubKey = Buffer.from(keyPair.public).toString('base64');
-
       return {
         preSharedKey: preSharedKeyB64,
         privKey,
@@ -128,10 +127,11 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
 
   const fetchNodesData = useCallback(async () => {
     if (!token) {
-      Alert.alert('Error', 'Please authenticate first');
+      setNodesError('Please authenticate first');
       return;
     }
-
+    setIsLoadingNodes(true);
+    setNodesError(null);
     try {
       const response = await axios.get(`${apiConfig.gatewayUrl}api/v1.0/nodes/all`, {
         headers: {
@@ -140,7 +140,6 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
           Authorization: `Bearer ${token}`,
         },
       });
-
       if (response.status === 200) {
         const payload = response.data.payload;
         const filteredNodes = payload.filter(
@@ -148,34 +147,39 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
             node.status === 'active' && node.region !== undefined && node.region !== null && node.region.trim(),
         );
         setNodesData(filteredNodes);
+      } else {
+        setNodesError('Failed to fetch available nodes');
       }
     } catch (error) {
+      setNodesError('Failed to fetch available nodes');
       console.error('Error fetching nodes data:', error);
-      Alert.alert('Error', 'Failed to fetch available nodes');
+    } finally {
+      setIsLoadingNodes(false);
     }
   }, [apiConfig, token]);
+
+  React.useEffect(() => {
+    fetchNodesData();
+  }, [fetchNodesData]);
 
   const createVPNClient = useCallback(async () => {
     if (!token) {
       Alert.alert('Error', 'Please authenticate first');
       return;
     }
-
+    const selectedNode = nodesData.find((n) => n.id === selectedNodeId);
     if (!selectedNode) {
       Alert.alert('Error', 'Please select a node first');
       return;
     }
-
     setIsCreatingClient(true);
     try {
       const keys = generateKeys();
-
       const requestData = {
         name: newClientName,
         presharedKey: keys.preSharedKey,
         publicKey: keys.pubKey,
       };
-
       const response = await axios.post(
         `${apiConfig.gatewayUrl}api/v1.0/erebrus/client/${selectedNode.id}`,
         requestData,
@@ -187,11 +191,9 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
           },
         },
       );
-
       if (response.status === 200) {
         const data = response.data;
         const client = data.payload.client;
-
         const configFile = `
 [Interface]
 Address = ${client.Address[0]}
@@ -204,10 +206,8 @@ PresharedKey = ${client.PresharedKey}
 AllowedIPs = 0.0.0.0/0, ::/0
 Endpoint = ${data.payload.endpoint}:51820
 PersistentKeepalive = 16`;
-
         setConfigFile(configFile);
         setShowQrCode(true);
-
         const vpnConfig = {
           privateKey: keys.privKey,
           publicKey: keys.pubKey,
@@ -219,7 +219,6 @@ PersistentKeepalive = 16`;
           presharedKey: client.PresharedKey,
           persistentKeepalive: 16,
         };
-
         onClientCreated({ configFile, vpnConfig });
       }
     } catch (error: any) {
@@ -236,24 +235,7 @@ PersistentKeepalive = 16`;
     } finally {
       setIsCreatingClient(false);
     }
-  }, [apiConfig, token, selectedNode, newClientName, onClientCreated]);
-
-  React.useEffect(() => {
-    fetchNodesData();
-  }, [fetchNodesData]);
-
-  const generateSerialNumber = (region: string, index: number) => {
-    return `${region}-${(index + 1).toString().padStart(3, '0')}`;
-  };
-
-  const sliceNodeId = (id: string) => {
-    return id.substring(0, 8) + '...' + id.substring(id.length - 4);
-  };
-
-  const sliceWalletAddress = (address: string) => {
-    if (!address) return 'N/A';
-    return address.substring(0, 6) + '...' + address.substring(address.length - 4);
-  };
+  }, [apiConfig, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -282,109 +264,49 @@ PersistentKeepalive = 16`;
               />
 
               <Text style={[styles.label, { color: theme.text }]}>Region</Text>
-              <ScrollView style={styles.regionList} showsVerticalScrollIndicator={false}>
-                {REGIONS.map((region) => (
-                  <TouchableOpacity
-                    key={region.id}
-                    style={[
-                      styles.regionItem,
-                      {
-                        backgroundColor: selectedRegion === region.id ? theme.primary : theme.background,
-                        borderColor: theme.border,
-                      },
-                    ]}
-                    onPress={() => {
-                      setSelectedRegion(region.id);
-                      setSelectedNode(null);
-                      setSelectedNodeIndex(null);
+              <View style={styles.pickerWrapper}>
+                <Picker
+                  selectedValue={selectedRegion}
+                  onValueChange={(itemValue: string) => {
+                    setSelectedRegion(itemValue);
+                    setSelectedNodeId('');
+                  }}
+                  style={{ color: theme.text }}
+                >
+                  <Picker.Item label="Select a region" value="" />
+                  {REGIONS.map((region) => (
+                    <Picker.Item key={region.id} label={region.name} value={region.id} />
+                  ))}
+                </Picker>
+              </View>
+
+              <Text style={[styles.label, { color: theme.text }]}>Node</Text>
+              {isLoadingNodes ? (
+                <ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 10 }} />
+              ) : nodesError ? (
+                <Text style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</Text>
+              ) : (
+                <View style={styles.pickerWrapper}>
+                  <Picker
+                    enabled={!!selectedRegion && nodesData.filter((n) => n.region === selectedRegion).length > 0}
+                    selectedValue={selectedNodeId}
+                    onValueChange={(itemValue: string) => {
+                      setSelectedNodeId(itemValue);
                     }}
+                    style={{ color: theme.text }}
                   >
-                    <Text
-                      style={[
-                        styles.regionText,
-                        { color: selectedRegion === region.id ? '#ffffff' : theme.text },
-                      ]}
-                    >
-                      {region.name} ({region.id})
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              {selectedRegion && (
-                <>
-                  <Text style={[styles.label, { color: theme.text }]}>Select Node</Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.nodeSelector,
-                      {
-                        backgroundColor: theme.background,
-                        borderColor: theme.border,
-                      },
-                    ]}
-                    onPress={() => setIsNodeDropdownOpen(!isNodeDropdownOpen)}
-                  >
-                    <Text style={{ color: theme.text }}>
-                      {selectedNode ? (
-                        <>
-                          <Text>{generateSerialNumber(selectedRegion, selectedNodeIndex || 0)}-</Text>
-                          <Text>{sliceNodeId(selectedNode.id)}</Text>
-                        </>
-                      ) : (
-                        'Select Node ID'
-                      )}
-                    </Text>
-                    <Text style={{ color: theme.textSecondary }}>▼</Text>
-                  </TouchableOpacity>
-
-                  {isNodeDropdownOpen && (
-                    <View
-                      style={[
-                        styles.nodeDropdown,
-                        { backgroundColor: theme.surface, borderColor: theme.border },
-                      ]}
-                    >
-                      <View style={styles.nodeDropdownHeader}>
-                        <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>S.No</Text>
-                        <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>Node ID</Text>
-                        <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>Wallet</Text>
-                        <Text style={[styles.nodeDropdownHeaderText, { color: theme.text }]}>Chain</Text>
-                      </View>
-                      <ScrollView style={styles.nodeList}>
-                        {nodesData
-                          .filter((node) => node.region === selectedRegion)
-                          .map((node, index) => (
-                            <TouchableOpacity
-                              key={node.id}
-                              style={[
-                                styles.nodeItem,
-                                {
-                                  backgroundColor: selectedNode?.id === node.id ? theme.primary : theme.background,
-                                  borderColor: theme.border,
-                                },
-                              ]}
-                              onPress={() => {
-                                setSelectedNode(node);
-                                setSelectedNodeIndex(index);
-                                setIsNodeDropdownOpen(false);
-                              }}
-                            >
-                              <Text style={[styles.nodeItemText, { color: theme.text }]}>
-                                {generateSerialNumber(selectedRegion, index)}
-                              </Text>
-                              <Text style={[styles.nodeItemText, { color: theme.text }]}>
-                                {sliceNodeId(node.id)}
-                              </Text>
-                              <Text style={[styles.nodeItemText, { color: theme.text }]}>
-                                {sliceWalletAddress(node.walletAddress)}
-                              </Text>
-                              <Text style={[styles.nodeItemText, { color: theme.text }]}>{node.chainName}</Text>
-                            </TouchableOpacity>
-                          ))}
-                      </ScrollView>
-                    </View>
-                  )}
-                </>
+                    <Picker.Item label="Select a node" value="" />
+                    {nodesData
+                      .filter((node) => node.region === selectedRegion)
+                      .map((node) => (
+                        <Picker.Item
+                          key={node.id}
+                          label={`${node.name || node.id.slice(0, 8)} (${node.chainName})`}
+                          value={node.id}
+                        />
+                      ))}
+                  </Picker>
+                </View>
               )}
 
               <TouchableOpacity
@@ -392,11 +314,11 @@ PersistentKeepalive = 16`;
                   styles.createButton,
                   {
                     backgroundColor: theme.primary,
-                    opacity: !newClientName || !selectedRegion || !selectedNode || isCreatingClient ? 0.5 : 1,
+                    opacity: !newClientName || !selectedRegion || !selectedNodeId || isCreatingClient ? 0.5 : 1,
                   },
                 ]}
                 onPress={createVPNClient}
-                disabled={!newClientName || !selectedRegion || !selectedNode || isCreatingClient}
+                disabled={!newClientName || !selectedRegion || !selectedNodeId || isCreatingClient}
               >
                 {isCreatingClient ? (
                   <ActivityIndicator color="#ffffff" size="small" />
@@ -449,66 +371,12 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
   },
-  regionList: {
-    maxHeight: 200,
-  },
-  regionItem: {
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+  pickerWrapper: {
     borderWidth: 1,
-  },
-  regionText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  nodeSelector: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
+    borderColor: '#e5e7eb',
     borderRadius: 8,
-    borderWidth: 1,
     marginBottom: 16,
-  },
-  nodeDropdown: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    maxHeight: 300,
-    borderRadius: 8,
-    borderWidth: 1,
-    zIndex: 1000,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  nodeDropdownHeader: {
-    flexDirection: 'row',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  nodeDropdownHeaderText: {
-    flex: 1,
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
-  nodeList: {
-    maxHeight: 250,
-  },
-  nodeItem: {
-    flexDirection: 'row',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  nodeItemText: {
-    flex: 1,
-    fontSize: 12,
+    overflow: 'hidden',
   },
   createButton: {
     padding: 16,

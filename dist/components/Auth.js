@@ -78,7 +78,7 @@ const Auth = ({ onTokenReceived }) => {
                 console.error('Token generation error:', tokenData);
                 return;
             }
-            const token = tokenData?.payload?.Token;
+            const token = tokenData?.payload?.token || tokenData?.payload?.Token;
             if (!token) {
                 setErrorMsg('No token returned');
                 setStatus('error');

@@ -68,7 +68,7 @@ const Auth = ({ onTokenReceived }) => {
             // Step 2: Get token
             const tokenRes = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation/token', {
                 method: 'GET',
-                headers: { 'X-API-Key': apiKey },
+                headers: { 'X-ORG-API-KEY': apiKey },
             });
             const tokenData = await tokenRes.json();
             if (!tokenRes.ok) {

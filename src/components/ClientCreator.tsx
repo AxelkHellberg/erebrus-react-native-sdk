@@ -218,7 +218,7 @@ PersistentKeepalive = 16`;
         setShowQrCode(true);
         const vpnConfig = {
           privateKey: keys.privKey,
-          publicKey: keys.pubKey,
+          publicKey: data.payload.serverPublicKey,
           serverAddress: data.payload.endpoint,
           serverPort: 51820,
           allowedIPs: ['0.0.0.0/0', '::/0'],

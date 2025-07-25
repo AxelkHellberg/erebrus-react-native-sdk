@@ -3,6 +3,7 @@ import { type WireGuardStatus } from "react-native-wireguard-vpn-connect";
 interface VPNConfig {
     privateKey: string;
     publicKey: string;
+    address: string;
     serverAddress: string;
     serverPort: number;
     allowedIPs: string[];

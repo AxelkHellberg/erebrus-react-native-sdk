@@ -5,6 +5,7 @@ import { Alert } from 'react-native';
 interface VPNConfig {
   privateKey: string;
   publicKey: string;
+  address: string;
   serverAddress: string;
   serverPort: number;
   allowedIPs: string[];

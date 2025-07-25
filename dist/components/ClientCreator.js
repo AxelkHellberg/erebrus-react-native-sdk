@@ -188,6 +188,7 @@ PersistentKeepalive = 16`;
                 const vpnConfig = {
                     privateKey: keys.privKey,
                     publicKey: data.payload.serverPublicKey,
+                    address: client.Address[0],
                     serverAddress: data.payload.endpoint,
                     serverPort: 51820,
                     allowedIPs: ['0.0.0.0/0', '::/0'],

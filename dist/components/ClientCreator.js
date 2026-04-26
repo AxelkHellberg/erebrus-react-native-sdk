@@ -216,7 +216,7 @@ PersistentKeepalive = 16`;
         }
     }, [apiConfig, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
     return (<react_native_1.ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-      {!token ? (<Auth_1.Auth onTokenReceived={handleTokenReceived}/>) : (<>
+      {!token ? (<Auth_1.Auth onTokenReceived={handleTokenReceived} theme={theme}/>) : (<>
           <react_native_1.View style={[styles.section, { backgroundColor: theme.surface }]}>
             <react_native_1.Text style={[styles.sectionTitle, { color: theme.text }]}>Create New Client</react_native_1.Text>
             <react_native_1.View style={styles.form}>

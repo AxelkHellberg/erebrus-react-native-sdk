@@ -36,10 +36,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Auth = void 0;
 const react_1 = __importStar(require("react"));
 const react_native_1 = require("react-native");
-const Auth = ({ onTokenReceived }) => {
+const defaultTheme = {
+    background: '#f5f5f5',
+    surface: '#ffffff',
+    primary: '#007AFF',
+    text: '#000000',
+    success: '#10b981',
+    error: '#ef4444',
+    border: '#e5e7eb',
+};
+const Auth = ({ onTokenReceived, theme }) => {
     const [isLoading, setIsLoading] = (0, react_1.useState)(false);
     const [status, setStatus] = (0, react_1.useState)('idle');
     const [errorMsg, setErrorMsg] = (0, react_1.useState)(null);
+    const resolvedTheme = { ...defaultTheme, ...theme };
     const handleAuth = async () => {
         setIsLoading(true);
         setStatus('idle');
@@ -97,12 +107,22 @@ const Auth = ({ onTokenReceived }) => {
             setIsLoading(false);
         }
     };
-    return (<react_native_1.View style={styles.container}>
-      <react_native_1.TouchableOpacity style={styles.button} onPress={handleAuth} disabled={isLoading}>
-        {isLoading ? (<react_native_1.ActivityIndicator color="#fff"/>) : (<react_native_1.Text style={styles.buttonText}>Create Organization & Get Token</react_native_1.Text>)}
+    return (<react_native_1.View style={[styles.container, { backgroundColor: resolvedTheme.background }]}>
+      <react_native_1.TouchableOpacity style={[
+            styles.button,
+            {
+                backgroundColor: resolvedTheme.primary,
+                borderColor: resolvedTheme.border,
+            },
+        ]} onPress={handleAuth} disabled={isLoading}>
+        {isLoading ? (<react_native_1.ActivityIndicator color="#fff"/>) : (<react_native_1.Text style={[styles.buttonText, { color: resolvedTheme.surface }]}>
+            Create Organization & Get Token
+          </react_native_1.Text>)}
       </react_native_1.TouchableOpacity>
-      {status === 'success' && <react_native_1.Text style={styles.success}>Token generated!</react_native_1.Text>}
-      {status === 'error' && (<react_native_1.Text style={styles.error}>{errorMsg || 'Something went wrong. Try again.'}</react_native_1.Text>)}
+      {status === 'success' && (<react_native_1.Text style={[styles.success, { color: resolvedTheme.success }]}>Token generated!</react_native_1.Text>)}
+      {status === 'error' && (<react_native_1.Text style={[styles.error, { color: resolvedTheme.error }]}>
+          {errorMsg || 'Something went wrong. Try again.'}
+        </react_native_1.Text>)}
     </react_native_1.View>);
 };
 exports.Auth = Auth;
@@ -113,26 +133,25 @@ const styles = react_native_1.StyleSheet.create({
         padding: 20,
     },
     button: {
-        backgroundColor: '#007AFF',
         padding: 16,
         borderRadius: 8,
+        borderWidth: 1,
         minWidth: 220,
         alignItems: 'center',
         marginBottom: 16,
     },
     buttonText: {
-        color: '#fff',
         fontSize: 16,
         fontWeight: 'bold',
+        textAlign: 'center',
     },
     success: {
-        color: '#10b981',
         fontSize: 16,
         marginTop: 8,
     },
     error: {
-        color: '#ef4444',
         fontSize: 16,
         marginTop: 8,
+        textAlign: 'center',
     },
 });

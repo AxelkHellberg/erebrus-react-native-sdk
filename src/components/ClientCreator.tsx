@@ -247,7 +247,7 @@ PersistentKeepalive = 16`;
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
       {!token ? (
-        <Auth onTokenReceived={handleTokenReceived} />
+        <Auth onTokenReceived={handleTokenReceived} theme={theme} />
       ) : (
         <>
           <View style={[styles.section, { backgroundColor: theme.surface }]}>
@@ -497,4 +497,4 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-}); 
+});

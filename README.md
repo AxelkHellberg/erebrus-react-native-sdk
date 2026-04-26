@@ -50,7 +50,7 @@ const Authentication = () => {
     console.log('Token received:', token);
   };
 
-  return <Auth onTokenReceived={handleTokenReceived} />;
+  return <Auth onTokenReceived={handleTokenReceived} theme={customTheme} />;
 };
 ```
 
@@ -59,6 +59,7 @@ The Auth component provides:
 - API key management
 - Token generation
 - Automatic token refresh
+- Optional theme overrides for the built-in auth button and status messages
 
 ### Using the Connection Button
 
@@ -67,19 +68,22 @@ import { ConnectionButton, useVPN } from 'erebrus-react-native-sdk';
 
 const VPNConnection = () => {
   const { vpnStatus, isConnecting, isDisconnecting, connectVPN, disconnectVPN } = useVPN();
+  const handleConnect = () => connectVPN(savedVpnConfig);
 
   return (
     <ConnectionButton
       isConnected={vpnStatus?.isConnected || false}
       isConnecting={isConnecting}
       isDisconnecting={isDisconnecting}
-      onConnect={connectVPN}
+      onConnect={handleConnect}
       onDisconnect={disconnectVPN}
       theme={customTheme} // Optional theme customization
     />
   );
 };
 ```
+
+`connectVPN` expects a generated VPN config. Store the `vpnConfig` returned by `ClientCreator` and pass it into `connectVPN` when the user taps connect.
 
 ### Creating a New VPN Client
 
@@ -143,9 +147,11 @@ const VPNScreen = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showQrCodeModal, setShowQrCodeModal] = useState(false);
   const [configFile, setConfigFile] = useState("");
+  const [vpnConfig, setVpnConfig] = useState(null);
 
   const handleClientCreated = ({ configFile, vpnConfig }) => {
     setConfigFile(configFile);
+    setVpnConfig(vpnConfig);
     setShowQrCodeModal(true);
     setShowCreateModal(false);
   };
@@ -163,7 +169,7 @@ const VPNScreen = () => {
         isConnected={vpnStatus?.isConnected || false}
         isConnecting={isConnecting}
         isDisconnecting={isDisconnecting}
-        onConnect={connectVPN}
+        onConnect={() => vpnConfig && connectVPN(vpnConfig)}
         onDisconnect={disconnectVPN}
       />
 

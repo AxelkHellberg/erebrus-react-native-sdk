@@ -63,23 +63,36 @@ The Auth component provides:
 ### Using the Connection Button
 
 ```tsx
-import { ConnectionButton, useVPN } from 'erebrus-react-native-sdk';
+import { useCallback } from 'react';
+import { ConnectionButton, useVPN, type VPNConfig } from 'erebrus-react-native-sdk';
 
-const VPNConnection = () => {
+const VPNConnection = ({ vpnConfig }: { vpnConfig: VPNConfig | null }) => {
   const { vpnStatus, isConnecting, isDisconnecting, connectVPN, disconnectVPN } = useVPN();
+
+  const handleConnect = useCallback(() => {
+    if (vpnConfig) {
+      connectVPN(vpnConfig);
+    }
+  }, [connectVPN, vpnConfig]);
 
   return (
     <ConnectionButton
       isConnected={vpnStatus?.isConnected || false}
       isConnecting={isConnecting}
       isDisconnecting={isDisconnecting}
-      onConnect={connectVPN}
+      onConnect={handleConnect}
       onDisconnect={disconnectVPN}
       theme={customTheme} // Optional theme customization
     />
   );
 };
 ```
+
+`connectVPN` expects a `VPNConfig` object, so the usual flow is:
+
+1. Render `ClientCreator`
+2. Store the returned `vpnConfig`
+3. Call `connectVPN(vpnConfig)` from your connect button handler
 
 ### Creating a New VPN Client
 
@@ -89,8 +102,8 @@ import { ClientCreator } from 'erebrus-react-native-sdk';
 const CreateClient = () => {
   const handleClientCreated = ({ configFile, vpnConfig }) => {
     console.log('Client created:', configFile);
-    // The configFile can be used to generate a QR code
-    // The vpnConfig can be used to connect to the VPN
+    // The configFile can be used to generate a QR code.
+    // Store vpnConfig and pass it to connectVPN when the user taps Connect.
   };
 
   return (
@@ -125,7 +138,7 @@ const VPNStatus = () => {
 
 ### Complete Example
 
-Here's a complete example showing how to use all components together:
+Here's a complete example showing the expected flow: authenticate, create a client, store the returned `vpnConfig`, and connect with that config.
 
 ```tsx
 import { 
@@ -136,19 +149,25 @@ import {
   ClientCreator,
   useVPN 
 } from 'erebrus-react-native-sdk';
+import { SafeAreaView, Text, TouchableOpacity, Modal } from 'react-native';
+import { useCallback, useState } from 'react';
 
 const VPNScreen = () => {
   const { vpnStatus, isConnecting, isDisconnecting, connectVPN, disconnectVPN } = useVPN();
   const [token, setToken] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showQrCodeModal, setShowQrCodeModal] = useState(false);
-  const [configFile, setConfigFile] = useState("");
+  const [vpnConfig, setVpnConfig] = useState(null);
 
-  const handleClientCreated = ({ configFile, vpnConfig }) => {
-    setConfigFile(configFile);
-    setShowQrCodeModal(true);
+  const handleClientCreated = ({ vpnConfig }) => {
+    setVpnConfig(vpnConfig);
     setShowCreateModal(false);
   };
+
+  const handleConnect = useCallback(() => {
+    if (vpnConfig) {
+      connectVPN(vpnConfig);
+    }
+  }, [connectVPN, vpnConfig]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -163,7 +182,7 @@ const VPNScreen = () => {
         isConnected={vpnStatus?.isConnected || false}
         isConnecting={isConnecting}
         isDisconnecting={isDisconnecting}
-        onConnect={connectVPN}
+        onConnect={handleConnect}
         onDisconnect={disconnectVPN}
       />
 
@@ -182,13 +201,6 @@ const VPNScreen = () => {
             }}
             onClientCreated={handleClientCreated}
           />
-        </Modal>
-      )}
-
-      {/* QR Code Modal */}
-      {showQrCodeModal && configFile && (
-        <Modal>
-          <QRCode value={configFile} size={200} />
         </Modal>
       )}
     </SafeAreaView>

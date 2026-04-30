@@ -54,11 +54,10 @@ const Authentication = () => {
 };
 ```
 
-The Auth component provides:
-- Organization creation
-- API key management
-- Token generation
-- Automatic token refresh
+The Auth component:
+- Creates an organization through the Erebrus gateway
+- Exchanges the returned API key for a token
+- Calls `onTokenReceived` with the generated token
 
 ### Using the Connection Button
 
@@ -216,7 +215,7 @@ const App = () => (
 
 ### Customizing the Theme
 
-All components accept a theme prop for customization:
+`ConnectionButton`, `ClientCreator`, and `StatusCard` accept a theme prop for customization:
 
 ```tsx
 const customTheme = {
@@ -254,7 +253,6 @@ The authentication component that handles organization creation and token genera
 #### Props
 
 - `onTokenReceived`: Callback function that receives the generated token
-- `theme`: Optional theme object for customization
 
 ### useVPN Hook
 

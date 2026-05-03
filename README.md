@@ -140,24 +140,25 @@ const VPNStatus = () => {
 Here's a complete example showing the expected flow: authenticate, create a client, store the returned `vpnConfig`, and connect with that config.
 
 ```tsx
-import { 
-  VPNProvider, 
-  Auth, 
-  StatusCard, 
-  ConnectionButton, 
+import {
+  VPNProvider,
+  Auth,
+  StatusCard,
+  ConnectionButton,
   ClientCreator,
-  useVPN 
+  useVPN,
+  type VPNConfig,
 } from 'erebrus-react-native-sdk';
-import { SafeAreaView, Text, TouchableOpacity, Modal } from 'react-native';
+import { Modal, SafeAreaView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { useCallback, useState } from 'react';
 
 const VPNScreen = () => {
   const { vpnStatus, isConnecting, isDisconnecting, connectVPN, disconnectVPN } = useVPN();
-  const [token, setToken] = useState("");
+  const [token, setToken] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [vpnConfig, setVpnConfig] = useState(null);
+  const [vpnConfig, setVpnConfig] = useState<VPNConfig | null>(null);
 
-  const handleClientCreated = ({ vpnConfig }) => {
+  const handleClientCreated = ({ vpnConfig }: { vpnConfig: VPNConfig }) => {
     setVpnConfig(vpnConfig);
     setShowCreateModal(false);
   };
@@ -211,6 +212,15 @@ const App = () => (
     <VPNScreen />
   </VPNProvider>
 );
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 24,
+    gap: 16,
+    backgroundColor: '#0f172a',
+  },
+});
 ```
 
 ### Customizing the Theme

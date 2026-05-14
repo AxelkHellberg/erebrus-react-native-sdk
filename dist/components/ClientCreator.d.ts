@@ -10,6 +10,7 @@ interface ClientCreatorProps {
         vpnConfig: {
             privateKey: string;
             publicKey: string;
+            address: string;
             serverAddress: string;
             serverPort: number;
             allowedIPs: string[];

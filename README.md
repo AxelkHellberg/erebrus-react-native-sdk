@@ -46,8 +46,8 @@ import { Auth } from 'erebrus-react-native-sdk';
 
 const Authentication = () => {
   const handleTokenReceived = (token: string) => {
-    // Store the token and proceed with VPN setup
-    console.log('Token received:', token);
+    // Store the token using your app's secure storage, then proceed with VPN setup.
+    // Never write bearer tokens to device logs.
   };
 
   return <Auth onTokenReceived={handleTokenReceived} />;
@@ -100,9 +100,8 @@ import { ClientCreator } from 'erebrus-react-native-sdk';
 
 const CreateClient = () => {
   const handleClientCreated = ({ configFile, vpnConfig }) => {
-    console.log('Client created:', configFile);
-    // The configFile can be used to generate a QR code.
-    // Store vpnConfig and pass it to connectVPN when the user taps Connect.
+    // Treat the generated configuration as a credential; do not log or persist it insecurely.
+    // Store vpnConfig using your app's secure storage and pass it to connectVPN when the user taps Connect.
   };
 
   return (

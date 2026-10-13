@@ -156,9 +156,6 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
                 publicKey: keys.pubKey,
             };
             const url = `${apiConfig.gatewayUrl}api/v1.0/erebrus/client/${selectedNodeId}`;
-            console.log('Token used for client creation:', token);
-            console.log('POST URL:', url);
-            console.log('Request body:', requestData);
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {

@@ -66,6 +66,7 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
     primary: '#6366f1',
     border: '#e5e7eb',
 }, }) => {
+    const gatewayUrl = apiConfig.gatewayUrl.replace(/\/+$/, '') + '/';
     const [newClientName, setNewClientName] = (0, react_1.useState)('');
     const [selectedRegion, setSelectedRegion] = (0, react_1.useState)('');
     const [isCreatingClient, setIsCreatingClient] = (0, react_1.useState)(false);
@@ -80,14 +81,14 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
     const [configFile, setConfigFile] = (0, react_1.useState)('');
     const [authentication, setAuthentication] = (0, react_1.useState)({
         suppliedToken: apiConfig.token,
-        gatewayUrl: apiConfig.gatewayUrl,
+        gatewayUrl,
         token: apiConfig.token,
     });
     const sameAuthentication = authentication.suppliedToken === apiConfig.token &&
-        authentication.gatewayUrl === apiConfig.gatewayUrl;
+        authentication.gatewayUrl === gatewayUrl;
     // Reset before committing effects so a new gateway never receives an old token.
     if (!sameAuthentication) {
-        setAuthentication({ suppliedToken: apiConfig.token, gatewayUrl: apiConfig.gatewayUrl, token: apiConfig.token });
+        setAuthentication({ suppliedToken: apiConfig.token, gatewayUrl, token: apiConfig.token });
     }
     const token = sameAuthentication ? authentication.token : apiConfig.token;
     const [isLoadingNodes, setIsLoadingNodes] = (0, react_1.useState)(false);
@@ -101,9 +102,9 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
             mounted.current = false;
             creationGeneration.current += 1;
         };
-    }, [apiConfig.gatewayUrl, token]);
+    }, [gatewayUrl, token]);
     const handleTokenReceived = (newToken) => {
-        setAuthentication({ suppliedToken: apiConfig.token, gatewayUrl: apiConfig.gatewayUrl, token: newToken });
+        setAuthentication({ suppliedToken: apiConfig.token, gatewayUrl, token: newToken });
     };
     const generateKeys = () => {
         try {
@@ -140,7 +141,7 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
             setIsLoadingNodes(true);
             setNodesError(null);
             try {
-                const response = await axios_1.default.get(`${apiConfig.gatewayUrl}api/v1.0/nodes/all`, {
+                const response = await axios_1.default.get(`${gatewayUrl}api/v1.0/nodes/all`, {
                     headers: {
                         Accept: 'application/json',
                         'Content-Type': 'application/json',
@@ -171,7 +172,7 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
         };
         void fetchNodesData();
         return () => { active = false; };
-    }, [apiConfig.gatewayUrl, token]);
+    }, [gatewayUrl, token]);
     const createVPNClient = (0, react_1.useCallback)(async () => {
         if (creationInFlight.current || !mounted.current)
             return;
@@ -195,7 +196,7 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
                 presharedKey: keys.preSharedKey,
                 publicKey: keys.pubKey,
             };
-            const url = `${apiConfig.gatewayUrl}api/v1.0/erebrus/client/${selectedNodeId}`;
+            const url = `${gatewayUrl}api/v1.0/erebrus/client/${selectedNodeId}`;
             console.log('Token used for client creation:', token);
             console.log('POST URL:', url);
             console.log('Request body:', requestData);
@@ -264,7 +265,7 @@ PersistentKeepalive = 16`;
             if (mounted.current)
                 setIsCreatingClient(false);
         }
-    }, [apiConfig, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
+    }, [gatewayUrl, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
     return (<react_native_1.ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
       {!token ? (<Auth_1.Auth onTokenReceived={handleTokenReceived}/>) : (<>
           <react_native_1.View style={[styles.section, { backgroundColor: theme.surface }]}>

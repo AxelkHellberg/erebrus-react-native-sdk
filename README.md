@@ -308,6 +308,11 @@ A component for creating new VPN clients.
 - `apiConfig`: Configuration for the API
   - `token`: API token (received from Auth component)
   - `gatewayUrl`: API gateway URL
+
+    A gateway base URL may include a path prefix and may be supplied with or
+    without trailing slashes. Node lookup and client creation use exactly one
+    slash before the API path; changing only trailing slashes preserves the
+    current authentication and pending results.
 - `onClientCreated`: Callback when a client is created
   - Receives `{ configFile, vpnConfig }` object
   - `configFile`: String containing the WireGuard configuration

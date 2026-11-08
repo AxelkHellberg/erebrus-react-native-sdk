@@ -88,6 +88,7 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
     border: '#e5e7eb',
   },
 }) => {
+  const gatewayUrl = apiConfig.gatewayUrl.replace(/\/+$/, '') + '/';
   const [newClientName, setNewClientName] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('');
   const [isCreatingClient, setIsCreatingClient] = useState(false);
@@ -102,14 +103,14 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
   const [configFile, setConfigFile] = useState('');
   const [authentication, setAuthentication] = useState({
     suppliedToken: apiConfig.token,
-    gatewayUrl: apiConfig.gatewayUrl,
+    gatewayUrl,
     token: apiConfig.token,
   });
   const sameAuthentication = authentication.suppliedToken === apiConfig.token &&
-    authentication.gatewayUrl === apiConfig.gatewayUrl;
+    authentication.gatewayUrl === gatewayUrl;
   // Reset before committing effects so a new gateway never receives an old token.
   if (!sameAuthentication) {
-    setAuthentication({ suppliedToken: apiConfig.token, gatewayUrl: apiConfig.gatewayUrl, token: apiConfig.token });
+    setAuthentication({ suppliedToken: apiConfig.token, gatewayUrl, token: apiConfig.token });
   }
   const token = sameAuthentication ? authentication.token : apiConfig.token;
   const [isLoadingNodes, setIsLoadingNodes] = useState(false);
@@ -124,10 +125,10 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
       mounted.current = false;
       creationGeneration.current += 1;
     };
-  }, [apiConfig.gatewayUrl, token]);
+  }, [gatewayUrl, token]);
 
   const handleTokenReceived = (newToken: string) => {
-    setAuthentication({ suppliedToken: apiConfig.token, gatewayUrl: apiConfig.gatewayUrl, token: newToken });
+    setAuthentication({ suppliedToken: apiConfig.token, gatewayUrl, token: newToken });
   };
 
   const generateKeys = () => {
@@ -168,7 +169,7 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
       setIsLoadingNodes(true);
       setNodesError(null);
       try {
-        const response = await axios.get(`${apiConfig.gatewayUrl}api/v1.0/nodes/all`, {
+        const response = await axios.get(`${gatewayUrl}api/v1.0/nodes/all`, {
           headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
@@ -196,7 +197,7 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
     };
     void fetchNodesData();
     return () => { active = false; };
-  }, [apiConfig.gatewayUrl, token]);
+  }, [gatewayUrl, token]);
 
   const createVPNClient = useCallback(async () => {
     if (creationInFlight.current || !mounted.current) return;
@@ -220,7 +221,7 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
         presharedKey: keys.preSharedKey,
         publicKey: keys.pubKey,
       };
-      const url = `${apiConfig.gatewayUrl}api/v1.0/erebrus/client/${selectedNodeId}`;
+      const url = `${gatewayUrl}api/v1.0/erebrus/client/${selectedNodeId}`;
       console.log('Token used for client creation:', token);
       console.log('POST URL:', url);
       console.log('Request body:', requestData);
@@ -283,7 +284,7 @@ PersistentKeepalive = 16`;
       creationInFlight.current = false;
       if (mounted.current) setIsCreatingClient(false);
     }
-  }, [apiConfig, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
+  }, [gatewayUrl, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>

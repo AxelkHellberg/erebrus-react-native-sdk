@@ -45,19 +45,9 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const mounted = useRef(false);
+  const lifecycle = useRef(0);
   const statusRequest = useRef(0);
   const operation = useRef<'connect' | 'disconnect' | null>(null);
-
-  const initializeVPN = useCallback(async () => {
-    try {
-      await WireGuardVpnModule.initialize();
-      setIsInitialized(true);
-      await updateStatus();
-    } catch (error: any) {
-      console.error("VPN initialization failed:", error);
-      Alert.alert("Initialization Error", error.message || "Unknown error occurred");
-    }
-  }, []);
 
   const updateStatus = useCallback(async () => {
     if (!mounted.current) return;
@@ -73,10 +63,12 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
   }, []);
 
   const connectVPN = useCallback(async (config: VPNConfig) => {
-    if (operation.current !== null || !isInitialized) {
+    if (!mounted.current || operation.current !== null || !isInitialized) {
       return;
     }
 
+    const generation = lifecycle.current;
+    const isCurrent = () => mounted.current && lifecycle.current === generation;
     operation.current = 'connect';
     setIsConnecting(true);
     try {
@@ -85,8 +77,9 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
       }
 
       await WireGuardVpnModule.connect(config);
-      await updateStatus();
+      if (isCurrent()) await updateStatus();
     } catch (error: any) {
+      if (!isCurrent()) return;
       console.error("Connection failed:", error);
       let errorMessage = error.message || "Unknown error occurred";
       if (errorMessage.includes("KeyFormat")) {
@@ -97,35 +90,53 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
       Alert.alert("Connection Failed", errorMessage);
     } finally {
       operation.current = null;
-      setIsConnecting(false);
+      if (isCurrent()) setIsConnecting(false);
     }
   }, [isInitialized, updateStatus]);
 
   const disconnectVPN = useCallback(async () => {
-    if (operation.current !== null) return;
+    if (!mounted.current || operation.current !== null) return;
 
+    const generation = lifecycle.current;
+    const isCurrent = () => mounted.current && lifecycle.current === generation;
     operation.current = 'disconnect';
     setIsDisconnecting(true);
     try {
       await WireGuardVpnModule.disconnect();
-      await updateStatus();
+      if (isCurrent()) await updateStatus();
     } catch (error: any) {
+      if (!isCurrent()) return;
       console.error("Disconnection failed:", error);
       Alert.alert("Disconnection Failed", error.message || "Unknown error occurred");
     } finally {
       operation.current = null;
-      setIsDisconnecting(false);
+      if (isCurrent()) setIsDisconnecting(false);
     }
   }, [updateStatus]);
 
   useEffect(() => {
     mounted.current = true;
-    initializeVPN();
+    const generation = ++lifecycle.current;
+    const isCurrent = () => mounted.current && lifecycle.current === generation;
+    const initializeVPN = async () => {
+      try {
+        await WireGuardVpnModule.initialize();
+        if (!isCurrent()) return;
+        setIsInitialized(true);
+        await updateStatus();
+      } catch (error: any) {
+        if (!isCurrent()) return;
+        console.error("VPN initialization failed:", error);
+        Alert.alert("Initialization Error", error.message || "Unknown error occurred");
+      }
+    };
+    void initializeVPN();
     return () => {
       mounted.current = false;
+      lifecycle.current += 1;
       statusRequest.current += 1;
     };
-  }, [initializeVPN]);
+  }, [updateStatus]);
 
   const value = {
     vpnStatus,

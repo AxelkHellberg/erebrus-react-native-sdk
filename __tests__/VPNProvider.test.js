@@ -147,3 +147,69 @@ describe('VPNProvider status result ordering', () => {
     expect(console.error).not.toHaveBeenCalled();
   });
 });
+
+describe('VPNProvider unmount lifecycle', () => {
+  let renderer, current;
+  const { Alert } = require('react-native');
+  const mount = async () => {
+    function Consumer() { current = useVPN(); return null; }
+    await act(async () => { renderer = create(React.createElement(VPNProvider, null, React.createElement(Consumer))); });
+  };
+  const unmount = () => { act(() => renderer.unmount()); renderer = null; };
+  beforeEach(() => {
+    jest.resetAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    native.getStatus.mockResolvedValue({ isConnected: false });
+  });
+  afterEach(() => { if (renderer) unmount(); jest.restoreAllMocks(); });
+
+  test('does not start native changes through retained callbacks after unmount', async () => {
+    await mount();
+    const saved = current;
+    unmount();
+    await saved.connectVPN(config);
+    await saved.disconnectVPN();
+    await saved.updateStatus();
+    expect(native.connect).not.toHaveBeenCalled();
+    expect(native.disconnect).not.toHaveBeenCalled();
+    expect(native.getStatus).toHaveBeenCalledTimes(1);
+  });
+
+  test('ignores initialization failures after unmount', async () => {
+    const pending = deferred(); native.initialize.mockReturnValue(pending.promise);
+    await mount();
+    unmount();
+    await act(async () => { pending.reject(new Error('obsolete initialization')); await Promise.resolve(); });
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  test('does not refresh status when initialization finishes after unmount', async () => {
+    const pending = deferred(); native.initialize.mockReturnValue(pending.promise);
+    await mount();
+    unmount();
+    await act(async () => { pending.resolve(); await Promise.resolve(); });
+    expect(native.getStatus).not.toHaveBeenCalled();
+  });
+
+  test.each(['connect', 'disconnect'])('ignores a late %s failure after unmount', async operation => {
+    await mount();
+    const pending = deferred(); native[operation].mockReturnValue(pending.promise);
+    let request;
+    act(() => { request = operation === 'connect' ? current.connectVPN(config) : current.disconnectVPN(); });
+    unmount();
+    await act(async () => { pending.reject(new Error('obsolete operation')); await request; });
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  test('still reports a native failure while mounted and admits subsequent work', async () => {
+    await mount();
+    native.connect.mockRejectedValueOnce(new Error('connection failed'));
+    await act(async () => { await current.connectVPN(config); });
+    expect(Alert.alert).toHaveBeenCalledWith('Connection Failed', 'connection failed');
+    expect(current.isConnecting).toBe(false);
+    await act(async () => { await current.disconnectVPN(); });
+    expect(native.disconnect).toHaveBeenCalledTimes(1);
+  });
+});

@@ -262,6 +262,10 @@ The authentication component that handles organization creation and token genera
 #### Props
 
 - `onTokenReceived`: Callback function that receives the generated token
+- `gatewayUrl`: Optional gateway base URL, defaulting to `https://gateway.dev.netsepio.com/`.
+  Both organization creation and token exchange use this gateway. `ClientCreator`
+  passes its `apiConfig.gatewayUrl` to its embedded authentication flow. Changing
+  the gateway or unmounting the component discards results from the old flow.
 
 ### useVPN Hook
 

@@ -35,7 +35,7 @@ describe('ClientCreator creation ownership', () => {
     });
     act(() => { const list = renderer.root.findByType('FlatList'); list.props.renderItem({ item: node }).props.onPress(); });
   });
-  afterEach(() => { act(() => renderer.unmount()); global.fetch = originalFetch; jest.restoreAllMocks(); });
+  afterEach(() => { if (renderer) act(() => renderer.unmount()); global.fetch = originalFetch; jest.restoreAllMocks(); });
 
   test('admits a single POST for two taps before React commits', async () => {
     const pending = deferred(); global.fetch.mockReturnValue(pending.promise);
@@ -72,4 +72,79 @@ describe('ClientCreator creation ownership', () => {
     expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(onClientCreated).toHaveBeenCalledTimes(1);
   });
+  const changeAccount = async (token = 'replacement', gatewayUrl = 'https://gateway.test/') => {
+    await act(async () => { renderer.update(React.createElement(ClientCreator, { apiConfig: { token, gatewayUrl }, onClientCreated })); });
+  };
+
+  test.each(['token', 'gateway'])('ignores a creation success after changing %s', async kind => {
+    const pending = deferred(); global.fetch.mockReturnValue(pending.promise);
+    let request;
+    act(() => { request = button().props.onPress(); });
+    await changeAccount(kind === 'token' ? 'replacement' : 'test', kind === 'gateway' ? 'https://other.test/' : 'https://gateway.test/');
+    await act(async () => { pending.resolve(result()); await request; });
+    expect(onClientCreated).not.toHaveBeenCalled();
+    expect(renderer.root.findAllByType('QRCode')).toHaveLength(0);
+  });
+
+  test('ignores a response body that arrives after authentication changes', async () => {
+    const body = deferred(); global.fetch.mockResolvedValue({ status: 200, json: () => body.promise });
+    let request;
+    await act(async () => { request = button().props.onPress(); await Promise.resolve(); });
+    await changeAccount();
+    await act(async () => { body.resolve(await result().json()); await request; });
+    expect(onClientCreated).not.toHaveBeenCalled();
+  });
+
+  test('ignores a late network failure from the previous account', async () => {
+    const pending = deferred(); global.fetch.mockReturnValue(pending.promise);
+    let request;
+    act(() => { request = button().props.onPress(); });
+    await changeAccount();
+    await act(async () => { pending.reject(new Error('old failure')); await request; });
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  test('ignores an obsolete HTTP error body', async () => {
+    const body = deferred(); global.fetch.mockResolvedValue({ status: 503, text: () => body.promise });
+    let request;
+    await act(async () => { request = button().props.onPress(); await Promise.resolve(); });
+    await changeAccount();
+    await act(async () => { body.resolve('old failure'); await request; });
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  test('does not deliver a created client after unmount', async () => {
+    const pending = deferred(); global.fetch.mockReturnValue(pending.promise);
+    let request;
+    act(() => { request = button().props.onPress(); renderer.unmount(); });
+    renderer = null;
+    await act(async () => { pending.resolve(result()); await request; });
+    expect(onClientCreated).not.toHaveBeenCalled();
+  });
+
+  test('clears a completed configuration when authentication changes', async () => {
+    global.fetch.mockResolvedValue(result());
+    await act(async () => { await button().props.onPress(); });
+    expect(renderer.root.findAllByType('QRCode')).toHaveLength(1);
+    await changeAccount();
+    expect(renderer.root.findAllByType('QRCode')).toHaveLength(0);
+  });
+
+  test('keeps the old creation single-flight lock until settlement, then permits current work', async () => {
+    const pending = deferred(); global.fetch.mockReturnValueOnce(pending.promise);
+    let request; const press = button().props.onPress;
+    act(() => { request = press(); });
+    await changeAccount();
+    await act(async () => { await press(); });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    await act(async () => { pending.resolve(result()); await request; });
+    act(() => { const list = renderer.root.findByType('FlatList'); list.props.renderItem({ item: list.props.data[0] }).props.onPress(); });
+    global.fetch.mockResolvedValueOnce(result());
+    await act(async () => { await button().props.onPress(); });
+    expect(global.fetch.mock.calls[1][1].headers.Authorization).toBe('Bearer replacement');
+    expect(onClientCreated).toHaveBeenCalledTimes(1);
+  });
+
 });

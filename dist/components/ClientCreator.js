@@ -70,6 +70,8 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
     const [selectedRegion, setSelectedRegion] = (0, react_1.useState)('');
     const [isCreatingClient, setIsCreatingClient] = (0, react_1.useState)(false);
     const creationInFlight = (0, react_1.useRef)(false);
+    const creationGeneration = (0, react_1.useRef)(0);
+    const mounted = (0, react_1.useRef)(false);
     const [nodesData, setNodesData] = (0, react_1.useState)([]);
     const [selectedNodeId, setSelectedNodeId] = (0, react_1.useState)('');
     const [selectedNodeName, setSelectedNodeName] = (0, react_1.useState)('');
@@ -90,6 +92,16 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
     const token = sameAuthentication ? authentication.token : apiConfig.token;
     const [isLoadingNodes, setIsLoadingNodes] = (0, react_1.useState)(false);
     const [nodesError, setNodesError] = (0, react_1.useState)(null);
+    react_1.default.useEffect(() => {
+        mounted.current = true;
+        creationGeneration.current += 1;
+        setConfigFile('');
+        setShowQrCode(false);
+        return () => {
+            mounted.current = false;
+            creationGeneration.current += 1;
+        };
+    }, [apiConfig.gatewayUrl, token]);
     const handleTokenReceived = (newToken) => {
         setAuthentication({ suppliedToken: apiConfig.token, gatewayUrl: apiConfig.gatewayUrl, token: newToken });
     };
@@ -161,7 +173,7 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
         return () => { active = false; };
     }, [apiConfig.gatewayUrl, token]);
     const createVPNClient = (0, react_1.useCallback)(async () => {
-        if (creationInFlight.current)
+        if (creationInFlight.current || !mounted.current)
             return;
         if (!token) {
             react_native_1.Alert.alert('Error', 'Please authenticate first');
@@ -172,6 +184,8 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
             react_native_1.Alert.alert('Error', 'Please select a node first');
             return;
         }
+        const generation = creationGeneration.current;
+        const isCurrent = () => mounted.current && generation === creationGeneration.current;
         creationInFlight.current = true;
         setIsCreatingClient(true);
         try {
@@ -194,8 +208,12 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
                 },
                 body: JSON.stringify(requestData),
             });
+            if (!isCurrent())
+                return;
             if (response.status === 200) {
                 const data = await response.json();
+                if (!isCurrent())
+                    return;
                 const client = data.payload.client;
                 const configFile = `
 [Interface]
@@ -227,11 +245,15 @@ PersistentKeepalive = 16`;
             }
             else {
                 const errorText = await response.text();
+                if (!isCurrent())
+                    return;
                 console.error('Failed to create VPN client:', errorText);
                 react_native_1.Alert.alert('Error', `Failed to create VPN client: ${errorText}`);
             }
         }
         catch (error) {
+            if (!isCurrent())
+                return;
             console.error('Failed to create VPN client:', error);
             let errorMessage = 'Failed to create VPN client: ';
             errorMessage += error.message || 'Unknown error occurred';
@@ -239,7 +261,8 @@ PersistentKeepalive = 16`;
         }
         finally {
             creationInFlight.current = false;
-            setIsCreatingClient(false);
+            if (mounted.current)
+                setIsCreatingClient(false);
         }
     }, [apiConfig, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
     return (<react_native_1.ScrollView style={[styles.container, { backgroundColor: theme.background }]}>

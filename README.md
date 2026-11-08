@@ -119,6 +119,8 @@ const CreateClient = () => {
 
 `ClientCreator` allows one client-creation request at a time, including response-body processing. Additional taps while it is pending do not create another client. The control becomes available again after success or failure.
 
+Changing the authentication token or gateway clears the displayed client configuration and ignores pending creation results from the previous context. Unmounting also suppresses result delivery. This does not cancel a request already sent to the gateway or undo a client created there; check the gateway before manually retrying an uncertain creation.
+
 ### Displaying VPN Status
 
 ```tsx

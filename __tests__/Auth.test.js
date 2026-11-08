@@ -82,4 +82,73 @@ describe('Auth gateway ownership', () => {
       'https://embedded.test/api/v1.1/organisation', 'https://embedded.test/api/v1.1/organisation/token',
     ]);
   });
+
+  test('admits one organization POST for two taps before React commits', async () => {
+    let resolve;
+    global.fetch.mockReset().mockReturnValueOnce(new Promise(yes => { resolve = yes; })).mockResolvedValueOnce(token());
+    await act(async () => { renderer = create(render('https://one.test/')); });
+    const savedPress = renderer.root.findByType('TouchableOpacity').props.onPress;
+    let first, second;
+    act(() => { first = savedPress(); second = savedPress(); });
+    const calls = global.fetch.mock.calls.length;
+    await act(async () => { resolve(org()); await Promise.all([first, second]); });
+    expect(calls).toBe(1);
+    expect(onTokenReceived).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['organization', 'organization body', 'token body'])('keeps a single authentication flow during %s', async phase => {
+    let resolve;
+    const pending = new Promise(yes => { resolve = yes; });
+    global.fetch.mockReset();
+    if (phase === 'organization') global.fetch.mockReturnValueOnce(pending).mockResolvedValueOnce(token());
+    if (phase === 'organization body') global.fetch.mockResolvedValueOnce({ ok: true, json: () => pending }).mockResolvedValueOnce(token());
+    if (phase === 'token body') global.fetch.mockResolvedValueOnce(org()).mockResolvedValueOnce({ ok: true, json: () => pending });
+    await act(async () => { renderer = create(render('https://one.test/')); });
+    const savedPress = renderer.root.findByType('TouchableOpacity').props.onPress;
+    let first, second;
+    await act(async () => { first = savedPress(); await Promise.resolve(); });
+    const callsBefore = global.fetch.mock.calls.length;
+    act(() => { second = savedPress(); });
+    const callsAfter = global.fetch.mock.calls.length;
+    await act(async () => {
+      resolve(phase === 'organization' ? org() : phase === 'organization body' ? { api_key: 'test-api-key' } : { payload: { token: 'test-token' } });
+      await Promise.all([first, second]);
+    });
+    expect(callsAfter).toBe(callsBefore);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(onTokenReceived).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['network', 'http', 'body'])('releases single-flight ownership after %s failure', async phase => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch.mockReset();
+    if (phase === 'network') global.fetch.mockRejectedValueOnce(new Error('offline'));
+    if (phase === 'http') global.fetch.mockResolvedValueOnce({ ok: false, json: async () => ({ message: 'unavailable' }) });
+    if (phase === 'body') global.fetch.mockResolvedValueOnce({ ok: true, json: async () => { throw new Error('invalid JSON'); } });
+    await act(async () => { renderer = create(render('https://one.test/')); });
+    await act(async () => { await press(); });
+    global.fetch.mockResolvedValueOnce(org()).mockResolvedValueOnce(token());
+    await act(async () => { await press(); });
+    expect(onTokenReceived).toHaveBeenCalledTimes(1);
+    expect(renderer.root.findByType('TouchableOpacity').props.disabled).toBe(false);
+    jest.restoreAllMocks();
+  });
+
+  test('does not create another organization while an old gateway request settles', async () => {
+    let resolve;
+    global.fetch.mockReset().mockReturnValueOnce(new Promise(yes => { resolve = yes; }));
+    await act(async () => { renderer = create(render('https://old.test/')); });
+    let pending;
+    act(() => { pending = press(); });
+    await act(async () => { renderer.update(render('https://new.test/')); });
+    act(() => { void press(); });
+    const calls = global.fetch.mock.calls.length;
+    await act(async () => { resolve(org()); await pending; });
+    expect(calls).toBe(1);
+    expect(onTokenReceived).not.toHaveBeenCalled();
+    global.fetch.mockResolvedValueOnce(org()).mockResolvedValueOnce(token());
+    await act(async () => { await press(); });
+    expect(global.fetch.mock.calls[1][0]).toBe('https://new.test/api/v1.1/organisation');
+    expect(onTokenReceived).toHaveBeenCalledTimes(1);
+  });
 });

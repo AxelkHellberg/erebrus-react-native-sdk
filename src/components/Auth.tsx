@@ -15,16 +15,21 @@ export const Auth: React.FC<AuthProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const gatewayBaseUrl = gatewayUrl.replace(/\/+$/, '');
   const attempt = useRef(0);
+  const inFlight = useRef(false);
+  const mounted = useRef(false);
 
   useEffect(() => {
+    mounted.current = true;
     attempt.current += 1;
-    setIsLoading(false);
+    setIsLoading(inFlight.current);
     setStatus('idle');
     setErrorMsg(null);
-    return () => { attempt.current += 1; };
+    return () => { mounted.current = false; attempt.current += 1; };
   }, [gatewayBaseUrl]);
 
   const handleAuth = async () => {
+    if (!mounted.current || inFlight.current) return;
+    inFlight.current = true;
     const request = ++attempt.current;
     const isCurrent = () => request === attempt.current;
     setIsLoading(true);
@@ -85,7 +90,8 @@ export const Auth: React.FC<AuthProps> = ({
       setStatus('error');
       console.error('Auth error:', e);
     } finally {
-      if (isCurrent()) setIsLoading(false);
+      inFlight.current = false;
+      if (mounted.current) setIsLoading(false);
     }
   };
 

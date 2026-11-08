@@ -36,21 +36,36 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Auth = void 0;
 const react_1 = __importStar(require("react"));
 const react_native_1 = require("react-native");
-const Auth = ({ onTokenReceived }) => {
+const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/', }) => {
     const [isLoading, setIsLoading] = (0, react_1.useState)(false);
     const [status, setStatus] = (0, react_1.useState)('idle');
     const [errorMsg, setErrorMsg] = (0, react_1.useState)(null);
+    const gatewayBaseUrl = gatewayUrl.replace(/\/+$/, '');
+    const attempt = (0, react_1.useRef)(0);
+    (0, react_1.useEffect)(() => {
+        attempt.current += 1;
+        setIsLoading(false);
+        setStatus('idle');
+        setErrorMsg(null);
+        return () => { attempt.current += 1; };
+    }, [gatewayBaseUrl]);
     const handleAuth = async () => {
+        const request = ++attempt.current;
+        const isCurrent = () => request === attempt.current;
         setIsLoading(true);
         setStatus('idle');
         setErrorMsg(null);
         try {
             // Step 1: Create organization
-            const orgRes = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation', {
+            const orgRes = await fetch(`${gatewayBaseUrl}/api/v1.1/organisation`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
             });
+            if (!isCurrent())
+                return;
             const orgData = await orgRes.json();
+            if (!isCurrent())
+                return;
             if (!orgRes.ok) {
                 const msg = orgData?.message || 'Failed to create organization';
                 setErrorMsg(msg);
@@ -66,11 +81,15 @@ const Auth = ({ onTokenReceived }) => {
                 return;
             }
             // Step 2: Get token
-            const tokenRes = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation/token', {
+            const tokenRes = await fetch(`${gatewayBaseUrl}/api/v1.1/organisation/token`, {
                 method: 'GET',
                 headers: { 'X-ORG-API-KEY': apiKey },
             });
+            if (!isCurrent())
+                return;
             const tokenData = await tokenRes.json();
+            if (!isCurrent())
+                return;
             if (!tokenRes.ok) {
                 const msg = tokenData?.message || 'Failed to generate token';
                 setErrorMsg(msg);
@@ -89,12 +108,15 @@ const Auth = ({ onTokenReceived }) => {
             onTokenReceived(token);
         }
         catch (e) {
+            if (!isCurrent())
+                return;
             setErrorMsg(e?.message || 'Unknown error');
             setStatus('error');
             console.error('Auth error:', e);
         }
         finally {
-            setIsLoading(false);
+            if (isCurrent())
+                setIsLoading(false);
         }
     };
     return (<react_native_1.View style={styles.container}>

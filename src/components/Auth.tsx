@@ -1,26 +1,44 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 
 interface AuthProps {
   onTokenReceived: (token: string) => void;
+  gatewayUrl?: string;
 }
 
-export const Auth: React.FC<AuthProps> = ({ onTokenReceived }) => {
+export const Auth: React.FC<AuthProps> = ({
+  onTokenReceived,
+  gatewayUrl = 'https://gateway.dev.netsepio.com/',
+}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const gatewayBaseUrl = gatewayUrl.replace(/\/+$/, '');
+  const attempt = useRef(0);
+
+  useEffect(() => {
+    attempt.current += 1;
+    setIsLoading(false);
+    setStatus('idle');
+    setErrorMsg(null);
+    return () => { attempt.current += 1; };
+  }, [gatewayBaseUrl]);
 
   const handleAuth = async () => {
+    const request = ++attempt.current;
+    const isCurrent = () => request === attempt.current;
     setIsLoading(true);
     setStatus('idle');
     setErrorMsg(null);
     try {
       // Step 1: Create organization
-      const orgRes = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation', {
+      const orgRes = await fetch(`${gatewayBaseUrl}/api/v1.1/organisation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
+      if (!isCurrent()) return;
       const orgData = await orgRes.json();
+      if (!isCurrent()) return;
       if (!orgRes.ok) {
         const msg = orgData?.message || 'Failed to create organization';
         setErrorMsg(msg);
@@ -37,11 +55,13 @@ export const Auth: React.FC<AuthProps> = ({ onTokenReceived }) => {
       }
 
       // Step 2: Get token
-      const tokenRes = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation/token', {
+      const tokenRes = await fetch(`${gatewayBaseUrl}/api/v1.1/organisation/token`, {
         method: 'GET',
         headers: { 'X-ORG-API-KEY': apiKey },
       });
+      if (!isCurrent()) return;
       const tokenData = await tokenRes.json();
+      if (!isCurrent()) return;
       if (!tokenRes.ok) {
         const msg = tokenData?.message || 'Failed to generate token';
         setErrorMsg(msg);
@@ -60,11 +80,12 @@ export const Auth: React.FC<AuthProps> = ({ onTokenReceived }) => {
       setStatus('success');
       onTokenReceived(token);
     } catch (e: any) {
+      if (!isCurrent()) return;
       setErrorMsg(e?.message || 'Unknown error');
       setStatus('error');
       console.error('Auth error:', e);
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
   };
 
@@ -118,4 +139,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 8,
   },
-}); 
+});

@@ -42,14 +42,20 @@ const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/
     const [errorMsg, setErrorMsg] = (0, react_1.useState)(null);
     const gatewayBaseUrl = gatewayUrl.replace(/\/+$/, '');
     const attempt = (0, react_1.useRef)(0);
+    const inFlight = (0, react_1.useRef)(false);
+    const mounted = (0, react_1.useRef)(false);
     (0, react_1.useEffect)(() => {
+        mounted.current = true;
         attempt.current += 1;
-        setIsLoading(false);
+        setIsLoading(inFlight.current);
         setStatus('idle');
         setErrorMsg(null);
-        return () => { attempt.current += 1; };
+        return () => { mounted.current = false; attempt.current += 1; };
     }, [gatewayBaseUrl]);
     const handleAuth = async () => {
+        if (!mounted.current || inFlight.current)
+            return;
+        inFlight.current = true;
         const request = ++attempt.current;
         const isCurrent = () => request === attempt.current;
         setIsLoading(true);
@@ -115,7 +121,8 @@ const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/
             console.error('Auth error:', e);
         }
         finally {
-            if (isCurrent())
+            inFlight.current = false;
+            if (mounted.current)
                 setIsLoading(false);
         }
     };

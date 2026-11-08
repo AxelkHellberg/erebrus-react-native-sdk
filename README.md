@@ -59,6 +59,11 @@ The Auth component:
 - Exchanges the returned API key for a token
 - Calls `onTokenReceived` with the generated token
 
+While authentication is pending, additional taps are ignored until both the
+organization and token response bodies settle. Changing the gateway discards the
+old result but keeps the pending flow locked until it settles; it does not cancel
+an organization request already sent to the server. No automatic retry is made.
+
 ### Using the Connection Button
 
 ```tsx

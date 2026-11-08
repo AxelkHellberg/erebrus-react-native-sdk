@@ -310,6 +310,11 @@ A component for creating new VPN clients.
   - `vpnConfig`: Object containing the VPN configuration for connection
 - `theme`: Optional theme object for customization
 
+`ClientCreator` follows updates to `apiConfig.token` and `apiConfig.gatewayUrl`.
+Changing either clears the previous node selection. Equivalent config objects do
+not start another node request, and obsolete responses are ignored after a config
+change or unmount. Already-started HTTP requests are not cancelled.
+
 ### StatusCard
 
 A component for displaying VPN status information.

@@ -69,6 +69,7 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
     const [newClientName, setNewClientName] = (0, react_1.useState)('');
     const [selectedRegion, setSelectedRegion] = (0, react_1.useState)('');
     const [isCreatingClient, setIsCreatingClient] = (0, react_1.useState)(false);
+    const creationInFlight = (0, react_1.useRef)(false);
     const [nodesData, setNodesData] = (0, react_1.useState)([]);
     const [selectedNodeId, setSelectedNodeId] = (0, react_1.useState)('');
     const [selectedNodeName, setSelectedNodeName] = (0, react_1.useState)('');
@@ -160,6 +161,8 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
         return () => { active = false; };
     }, [apiConfig.gatewayUrl, token]);
     const createVPNClient = (0, react_1.useCallback)(async () => {
+        if (creationInFlight.current)
+            return;
         if (!token) {
             react_native_1.Alert.alert('Error', 'Please authenticate first');
             return;
@@ -169,6 +172,7 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
             react_native_1.Alert.alert('Error', 'Please select a node first');
             return;
         }
+        creationInFlight.current = true;
         setIsCreatingClient(true);
         try {
             const keys = generateKeys();
@@ -234,6 +238,7 @@ PersistentKeepalive = 16`;
             react_native_1.Alert.alert('Error', errorMessage);
         }
         finally {
+            creationInFlight.current = false;
             setIsCreatingClient(false);
         }
     }, [apiConfig, token, selectedNodeId, newClientName, nodesData, onClientCreated]);

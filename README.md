@@ -117,6 +117,8 @@ const CreateClient = () => {
 };
 ```
 
+`ClientCreator` allows one client-creation request at a time, including response-body processing. Additional taps while it is pending do not create another client. The control becomes available again after success or failure.
+
 ### Displaying VPN Status
 
 ```tsx

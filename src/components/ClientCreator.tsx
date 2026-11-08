@@ -3,7 +3,7 @@ import { Buffer } from 'buffer';
 if (typeof global.Buffer === 'undefined') {
   global.Buffer = Buffer;
 }
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -91,6 +91,7 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
   const [newClientName, setNewClientName] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('');
   const [isCreatingClient, setIsCreatingClient] = useState(false);
+  const creationInFlight = useRef(false);
   const [nodesData, setNodesData] = useState<Node[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState('');
   const [selectedNodeName, setSelectedNodeName] = useState('');
@@ -185,6 +186,7 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
   }, [apiConfig.gatewayUrl, token]);
 
   const createVPNClient = useCallback(async () => {
+    if (creationInFlight.current) return;
     if (!token) {
       Alert.alert('Error', 'Please authenticate first');
       return;
@@ -194,6 +196,7 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
       Alert.alert('Error', 'Please select a node first');
       return;
     }
+    creationInFlight.current = true;
     setIsCreatingClient(true);
     try {
       const keys = generateKeys();
@@ -258,6 +261,7 @@ PersistentKeepalive = 16`;
       errorMessage += error.message || 'Unknown error occurred';
       Alert.alert('Error', errorMessage);
     } finally {
+      creationInFlight.current = false;
       setIsCreatingClient(false);
     }
   }, [apiConfig, token, selectedNodeId, newClientName, nodesData, onClientCreated]);

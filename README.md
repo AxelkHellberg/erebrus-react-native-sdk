@@ -251,6 +251,11 @@ const customTheme = {
 
 The main provider component that manages VPN state and functionality.
 
+Callbacks retained after the provider unmounts do not start native VPN changes.
+Late initialization or connection failures also stop updating UI and showing
+alerts after unmount. An operation already sent to the native module is not
+cancelled, and unmount does not disconnect an existing tunnel automatically.
+
 #### Props
 
 - `children`: React nodes to be wrapped by the provider

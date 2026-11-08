@@ -55,19 +55,9 @@ const VPNProvider = ({ children }) => {
     const [isDisconnecting, setIsDisconnecting] = (0, react_1.useState)(false);
     const [isInitialized, setIsInitialized] = (0, react_1.useState)(false);
     const mounted = (0, react_1.useRef)(false);
+    const lifecycle = (0, react_1.useRef)(0);
     const statusRequest = (0, react_1.useRef)(0);
     const operation = (0, react_1.useRef)(null);
-    const initializeVPN = (0, react_1.useCallback)(async () => {
-        try {
-            await react_native_wireguard_vpn_connect_1.default.initialize();
-            setIsInitialized(true);
-            await updateStatus();
-        }
-        catch (error) {
-            console.error("VPN initialization failed:", error);
-            react_native_1.Alert.alert("Initialization Error", error.message || "Unknown error occurred");
-        }
-    }, []);
     const updateStatus = (0, react_1.useCallback)(async () => {
         if (!mounted.current)
             return;
@@ -84,9 +74,11 @@ const VPNProvider = ({ children }) => {
         }
     }, []);
     const connectVPN = (0, react_1.useCallback)(async (config) => {
-        if (operation.current !== null || !isInitialized) {
+        if (!mounted.current || operation.current !== null || !isInitialized) {
             return;
         }
+        const generation = lifecycle.current;
+        const isCurrent = () => mounted.current && lifecycle.current === generation;
         operation.current = 'connect';
         setIsConnecting(true);
         try {
@@ -94,9 +86,12 @@ const VPNProvider = ({ children }) => {
                 throw new Error("Invalid cryptographic keys");
             }
             await react_native_wireguard_vpn_connect_1.default.connect(config);
-            await updateStatus();
+            if (isCurrent())
+                await updateStatus();
         }
         catch (error) {
+            if (!isCurrent())
+                return;
             console.error("Connection failed:", error);
             let errorMessage = error.message || "Unknown error occurred";
             if (errorMessage.includes("KeyFormat")) {
@@ -109,35 +104,60 @@ const VPNProvider = ({ children }) => {
         }
         finally {
             operation.current = null;
-            setIsConnecting(false);
+            if (isCurrent())
+                setIsConnecting(false);
         }
     }, [isInitialized, updateStatus]);
     const disconnectVPN = (0, react_1.useCallback)(async () => {
-        if (operation.current !== null)
+        if (!mounted.current || operation.current !== null)
             return;
+        const generation = lifecycle.current;
+        const isCurrent = () => mounted.current && lifecycle.current === generation;
         operation.current = 'disconnect';
         setIsDisconnecting(true);
         try {
             await react_native_wireguard_vpn_connect_1.default.disconnect();
-            await updateStatus();
+            if (isCurrent())
+                await updateStatus();
         }
         catch (error) {
+            if (!isCurrent())
+                return;
             console.error("Disconnection failed:", error);
             react_native_1.Alert.alert("Disconnection Failed", error.message || "Unknown error occurred");
         }
         finally {
             operation.current = null;
-            setIsDisconnecting(false);
+            if (isCurrent())
+                setIsDisconnecting(false);
         }
     }, [updateStatus]);
     (0, react_1.useEffect)(() => {
         mounted.current = true;
-        initializeVPN();
+        const generation = ++lifecycle.current;
+        const isCurrent = () => mounted.current && lifecycle.current === generation;
+        const initializeVPN = async () => {
+            try {
+                await react_native_wireguard_vpn_connect_1.default.initialize();
+                if (!isCurrent())
+                    return;
+                setIsInitialized(true);
+                await updateStatus();
+            }
+            catch (error) {
+                if (!isCurrent())
+                    return;
+                console.error("VPN initialization failed:", error);
+                react_native_1.Alert.alert("Initialization Error", error.message || "Unknown error occurred");
+            }
+        };
+        void initializeVPN();
         return () => {
             mounted.current = false;
+            lifecycle.current += 1;
             statusRequest.current += 1;
         };
-    }, [initializeVPN]);
+    }, [updateStatus]);
     const value = {
         vpnStatus,
         isConnecting,

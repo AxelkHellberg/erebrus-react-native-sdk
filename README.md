@@ -117,6 +117,8 @@ const CreateClient = () => {
 };
 ```
 
+`ClientCreator` allows one client-creation request at a time, including response-body processing. Additional taps while it is pending do not create another client. The control becomes available again after success or failure.
+
 ### Displaying VPN Status
 
 ```tsx
@@ -277,6 +279,11 @@ A hook that provides access to VPN functionality.
 - `disconnectVPN`: Function to disconnect from VPN
 - `updateStatus`: Function to update VPN status
 
+Connection changes are single flight per provider: while a connect or disconnect
+and its status refresh are pending, additional connection-change calls return
+without starting another native operation. Use `isConnecting` and `isDisconnecting`
+to display progress and retry the desired action after the active operation ends.
+
 ### ConnectionButton
 
 A customizable button component for VPN connection control.
@@ -304,6 +311,11 @@ A component for creating new VPN clients.
   - `configFile`: String containing the WireGuard configuration
   - `vpnConfig`: Object containing the VPN configuration for connection
 - `theme`: Optional theme object for customization
+
+`ClientCreator` follows updates to `apiConfig.token` and `apiConfig.gatewayUrl`.
+Changing either clears the previous node selection. Equivalent config objects do
+not start another node request, and obsolete responses are ignored after a config
+change or unmount. Already-started HTTP requests are not cancelled.
 
 ### StatusCard
 

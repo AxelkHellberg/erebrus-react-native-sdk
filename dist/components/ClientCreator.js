@@ -69,17 +69,29 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
     const [newClientName, setNewClientName] = (0, react_1.useState)('');
     const [selectedRegion, setSelectedRegion] = (0, react_1.useState)('');
     const [isCreatingClient, setIsCreatingClient] = (0, react_1.useState)(false);
+    const creationInFlight = (0, react_1.useRef)(false);
     const [nodesData, setNodesData] = (0, react_1.useState)([]);
     const [selectedNodeId, setSelectedNodeId] = (0, react_1.useState)('');
     const [selectedNodeName, setSelectedNodeName] = (0, react_1.useState)('');
     const [showNodeModal, setShowNodeModal] = (0, react_1.useState)(false);
     const [showQrCode, setShowQrCode] = (0, react_1.useState)(false);
     const [configFile, setConfigFile] = (0, react_1.useState)('');
-    const [token, setToken] = (0, react_1.useState)(apiConfig.token);
+    const [authentication, setAuthentication] = (0, react_1.useState)({
+        suppliedToken: apiConfig.token,
+        gatewayUrl: apiConfig.gatewayUrl,
+        token: apiConfig.token,
+    });
+    const sameAuthentication = authentication.suppliedToken === apiConfig.token &&
+        authentication.gatewayUrl === apiConfig.gatewayUrl;
+    // Reset before committing effects so a new gateway never receives an old token.
+    if (!sameAuthentication) {
+        setAuthentication({ suppliedToken: apiConfig.token, gatewayUrl: apiConfig.gatewayUrl, token: apiConfig.token });
+    }
+    const token = sameAuthentication ? authentication.token : apiConfig.token;
     const [isLoadingNodes, setIsLoadingNodes] = (0, react_1.useState)(false);
     const [nodesError, setNodesError] = (0, react_1.useState)(null);
     const handleTokenReceived = (newToken) => {
-        setToken(newToken);
+        setAuthentication({ suppliedToken: apiConfig.token, gatewayUrl: apiConfig.gatewayUrl, token: newToken });
     };
     const generateKeys = () => {
         try {
@@ -102,42 +114,55 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
             throw new Error('Failed to generate cryptographic keys');
         }
     };
-    const fetchNodesData = (0, react_1.useCallback)(async () => {
+    react_1.default.useEffect(() => {
+        let active = true;
+        setNodesData([]);
+        setSelectedNodeId('');
+        setSelectedNodeName('');
         if (!token) {
             setNodesError('Please authenticate first');
+            setIsLoadingNodes(false);
             return;
         }
-        setIsLoadingNodes(true);
-        setNodesError(null);
-        try {
-            const response = await axios_1.default.get(`${apiConfig.gatewayUrl}api/v1.0/nodes/all`, {
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-            if (response.status === 200) {
-                const payload = response.data.payload;
-                const filteredNodes = payload.filter((node) => node.status === 'active' && node.region !== undefined && node.region !== null && node.region.trim());
-                setNodesData(filteredNodes);
+        const fetchNodesData = async () => {
+            setIsLoadingNodes(true);
+            setNodesError(null);
+            try {
+                const response = await axios_1.default.get(`${apiConfig.gatewayUrl}api/v1.0/nodes/all`, {
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+                if (!active)
+                    return;
+                if (response.status === 200) {
+                    const payload = response.data.payload;
+                    const filteredNodes = payload.filter((node) => node.status === 'active' && node.region !== undefined && node.region !== null && node.region.trim());
+                    setNodesData(filteredNodes);
+                }
+                else {
+                    setNodesError('Failed to fetch available nodes');
+                }
             }
-            else {
+            catch (error) {
+                if (!active)
+                    return;
                 setNodesError('Failed to fetch available nodes');
+                console.error('Error fetching nodes data:', error);
             }
-        }
-        catch (error) {
-            setNodesError('Failed to fetch available nodes');
-            console.error('Error fetching nodes data:', error);
-        }
-        finally {
-            setIsLoadingNodes(false);
-        }
-    }, [apiConfig, token]);
-    react_1.default.useEffect(() => {
-        fetchNodesData();
-    }, [fetchNodesData]);
+            finally {
+                if (active)
+                    setIsLoadingNodes(false);
+            }
+        };
+        void fetchNodesData();
+        return () => { active = false; };
+    }, [apiConfig.gatewayUrl, token]);
     const createVPNClient = (0, react_1.useCallback)(async () => {
+        if (creationInFlight.current)
+            return;
         if (!token) {
             react_native_1.Alert.alert('Error', 'Please authenticate first');
             return;
@@ -147,6 +172,7 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
             react_native_1.Alert.alert('Error', 'Please select a node first');
             return;
         }
+        creationInFlight.current = true;
         setIsCreatingClient(true);
         try {
             const keys = generateKeys();
@@ -212,6 +238,7 @@ PersistentKeepalive = 16`;
             react_native_1.Alert.alert('Error', errorMessage);
         }
         finally {
+            creationInFlight.current = false;
             setIsCreatingClient(false);
         }
     }, [apiConfig, token, selectedNodeId, newClientName, nodesData, onClientCreated]);

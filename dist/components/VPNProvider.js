@@ -54,6 +54,7 @@ const VPNProvider = ({ children }) => {
     const [isConnecting, setIsConnecting] = (0, react_1.useState)(false);
     const [isDisconnecting, setIsDisconnecting] = (0, react_1.useState)(false);
     const [isInitialized, setIsInitialized] = (0, react_1.useState)(false);
+    const operation = (0, react_1.useRef)(null);
     const initializeVPN = (0, react_1.useCallback)(async () => {
         try {
             await react_native_wireguard_vpn_connect_1.default.initialize();
@@ -75,9 +76,10 @@ const VPNProvider = ({ children }) => {
         }
     }, []);
     const connectVPN = (0, react_1.useCallback)(async (config) => {
-        if (isConnecting || !isInitialized) {
+        if (operation.current !== null || !isInitialized) {
             return;
         }
+        operation.current = 'connect';
         setIsConnecting(true);
         try {
             if (!config.privateKey || !config.publicKey) {
@@ -98,12 +100,14 @@ const VPNProvider = ({ children }) => {
             react_native_1.Alert.alert("Connection Failed", errorMessage);
         }
         finally {
+            operation.current = null;
             setIsConnecting(false);
         }
-    }, [isConnecting, isInitialized, updateStatus]);
+    }, [isInitialized, updateStatus]);
     const disconnectVPN = (0, react_1.useCallback)(async () => {
-        if (isDisconnecting)
+        if (operation.current !== null)
             return;
+        operation.current = 'disconnect';
         setIsDisconnecting(true);
         try {
             await react_native_wireguard_vpn_connect_1.default.disconnect();
@@ -114,9 +118,10 @@ const VPNProvider = ({ children }) => {
             react_native_1.Alert.alert("Disconnection Failed", error.message || "Unknown error occurred");
         }
         finally {
+            operation.current = null;
             setIsDisconnecting(false);
         }
-    }, [isDisconnecting, updateStatus]);
+    }, [updateStatus]);
     (0, react_1.useEffect)(() => {
         initializeVPN();
     }, [initializeVPN]);

@@ -76,6 +76,27 @@ describe('ClientCreator creation ownership', () => {
     await act(async () => { renderer.update(React.createElement(ClientCreator, { apiConfig: { token, gatewayUrl }, onClientCreated })); });
   };
 
+  test.each(['https://gateway.test', 'https://gateway.test/', 'https://gateway.test///', 'https://gateway.test/base'])('uses the gateway base consistently for node lookup and creation: %s', async gateway => {
+    await changeAccount('test', gateway);
+    act(() => { const list = renderer.root.findByType('FlatList'); list.props.renderItem({ item: list.props.data[0] }).props.onPress(); });
+    global.fetch.mockResolvedValueOnce(result());
+    await act(async () => { await button().props.onPress(); });
+    const base = gateway.includes('/base') ? 'https://gateway.test/base' : 'https://gateway.test';
+    expect(axios.get.mock.calls.at(-1)[0]).toBe(`${base}/api/v1.0/nodes/all`);
+    expect(global.fetch.mock.calls[0][0]).toBe(`${base}/api/v1.0/erebrus/client/node`);
+    expect(onClientCreated).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not invalidate a pending creation for equivalent gateway spelling', async () => {
+    const pending = deferred(); global.fetch.mockReturnValue(pending.promise);
+    let request;
+    act(() => { request = button().props.onPress(); });
+    await changeAccount('test', 'https://gateway.test');
+    await act(async () => { pending.resolve(result()); await request; });
+    expect(axios.get).toHaveBeenCalledTimes(1);
+    expect(onClientCreated).toHaveBeenCalledTimes(1);
+  });
+
   test.each(['token', 'gateway'])('ignores a creation success after changing %s', async kind => {
     const pending = deferred(); global.fetch.mockReturnValue(pending.promise);
     let request;

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import WireGuardVpnModule, { type WireGuardStatus } from "react-native-wireguard-vpn-connect";
 import { Alert } from 'react-native';
 
@@ -44,6 +44,7 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const operation = useRef<'connect' | 'disconnect' | null>(null);
 
   const initializeVPN = useCallback(async () => {
     try {
@@ -66,10 +67,11 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
   }, []);
 
   const connectVPN = useCallback(async (config: VPNConfig) => {
-    if (isConnecting || !isInitialized) {
+    if (operation.current !== null || !isInitialized) {
       return;
     }
 
+    operation.current = 'connect';
     setIsConnecting(true);
     try {
       if (!config.privateKey || !config.publicKey) {
@@ -88,13 +90,15 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
       }
       Alert.alert("Connection Failed", errorMessage);
     } finally {
+      operation.current = null;
       setIsConnecting(false);
     }
-  }, [isConnecting, isInitialized, updateStatus]);
+  }, [isInitialized, updateStatus]);
 
   const disconnectVPN = useCallback(async () => {
-    if (isDisconnecting) return;
+    if (operation.current !== null) return;
 
+    operation.current = 'disconnect';
     setIsDisconnecting(true);
     try {
       await WireGuardVpnModule.disconnect();
@@ -103,9 +107,10 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
       console.error("Disconnection failed:", error);
       Alert.alert("Disconnection Failed", error.message || "Unknown error occurred");
     } finally {
+      operation.current = null;
       setIsDisconnecting(false);
     }
-  }, [isDisconnecting, updateStatus]);
+  }, [updateStatus]);
 
   useEffect(() => {
     initializeVPN();
@@ -122,4 +127,4 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
   };
 
   return <VPNContext.Provider value={value}>{children}</VPNContext.Provider>;
-}; 
+};

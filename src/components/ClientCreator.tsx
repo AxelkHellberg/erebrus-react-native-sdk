@@ -46,6 +46,7 @@ interface ClientCreatorProps {
     vpnConfig: {
       privateKey: string;
       publicKey: string;
+      address: string;
       serverAddress: string;
       serverPort: number;
       allowedIPs: string[];
@@ -497,4 +498,4 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-}); 
+});

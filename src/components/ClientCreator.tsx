@@ -3,7 +3,7 @@ import { Buffer } from 'buffer';
 if (typeof global.Buffer === 'undefined') {
   global.Buffer = Buffer;
 }
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -91,18 +91,43 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
   const [newClientName, setNewClientName] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('');
   const [isCreatingClient, setIsCreatingClient] = useState(false);
+  const creationInFlight = useRef(false);
+  const creationGeneration = useRef(0);
+  const mounted = useRef(false);
   const [nodesData, setNodesData] = useState<Node[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState('');
   const [selectedNodeName, setSelectedNodeName] = useState('');
   const [showNodeModal, setShowNodeModal] = useState(false);
   const [showQrCode, setShowQrCode] = useState(false);
   const [configFile, setConfigFile] = useState('');
-  const [token, setToken] = useState(apiConfig.token);
+  const [authentication, setAuthentication] = useState({
+    suppliedToken: apiConfig.token,
+    gatewayUrl: apiConfig.gatewayUrl,
+    token: apiConfig.token,
+  });
+  const sameAuthentication = authentication.suppliedToken === apiConfig.token &&
+    authentication.gatewayUrl === apiConfig.gatewayUrl;
+  // Reset before committing effects so a new gateway never receives an old token.
+  if (!sameAuthentication) {
+    setAuthentication({ suppliedToken: apiConfig.token, gatewayUrl: apiConfig.gatewayUrl, token: apiConfig.token });
+  }
+  const token = sameAuthentication ? authentication.token : apiConfig.token;
   const [isLoadingNodes, setIsLoadingNodes] = useState(false);
   const [nodesError, setNodesError] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    mounted.current = true;
+    creationGeneration.current += 1;
+    setConfigFile('');
+    setShowQrCode(false);
+    return () => {
+      mounted.current = false;
+      creationGeneration.current += 1;
+    };
+  }, [apiConfig.gatewayUrl, token]);
+
   const handleTokenReceived = (newToken: string) => {
-    setToken(newToken);
+    setAuthentication({ suppliedToken: apiConfig.token, gatewayUrl: apiConfig.gatewayUrl, token: newToken });
   };
 
   const generateKeys = () => {
@@ -129,44 +154,52 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
     }
   };
 
-  const fetchNodesData = useCallback(async () => {
+  React.useEffect(() => {
+    let active = true;
+    setNodesData([]);
+    setSelectedNodeId('');
+    setSelectedNodeName('');
     if (!token) {
       setNodesError('Please authenticate first');
+      setIsLoadingNodes(false);
       return;
     }
-    setIsLoadingNodes(true);
-    setNodesError(null);
-    try {
-      const response = await axios.get(`${apiConfig.gatewayUrl}api/v1.0/nodes/all`, {
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (response.status === 200) {
-        const payload = response.data.payload;
-        const filteredNodes = payload.filter(
-          (node: Node) =>
-            node.status === 'active' && node.region !== undefined && node.region !== null && node.region.trim(),
-        );
-        setNodesData(filteredNodes);
-      } else {
+    const fetchNodesData = async () => {
+      setIsLoadingNodes(true);
+      setNodesError(null);
+      try {
+        const response = await axios.get(`${apiConfig.gatewayUrl}api/v1.0/nodes/all`, {
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!active) return;
+        if (response.status === 200) {
+          const payload = response.data.payload;
+          const filteredNodes = payload.filter(
+            (node: Node) =>
+              node.status === 'active' && node.region !== undefined && node.region !== null && node.region.trim(),
+          );
+          setNodesData(filteredNodes);
+        } else {
+          setNodesError('Failed to fetch available nodes');
+        }
+      } catch (error) {
+        if (!active) return;
         setNodesError('Failed to fetch available nodes');
+        console.error('Error fetching nodes data:', error);
+      } finally {
+        if (active) setIsLoadingNodes(false);
       }
-    } catch (error) {
-      setNodesError('Failed to fetch available nodes');
-      console.error('Error fetching nodes data:', error);
-    } finally {
-      setIsLoadingNodes(false);
-    }
-  }, [apiConfig, token]);
-
-  React.useEffect(() => {
-    fetchNodesData();
-  }, [fetchNodesData]);
+    };
+    void fetchNodesData();
+    return () => { active = false; };
+  }, [apiConfig.gatewayUrl, token]);
 
   const createVPNClient = useCallback(async () => {
+    if (creationInFlight.current || !mounted.current) return;
     if (!token) {
       Alert.alert('Error', 'Please authenticate first');
       return;
@@ -176,6 +209,9 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
       Alert.alert('Error', 'Please select a node first');
       return;
     }
+    const generation = creationGeneration.current;
+    const isCurrent = () => mounted.current && generation === creationGeneration.current;
+    creationInFlight.current = true;
     setIsCreatingClient(true);
     try {
       const keys = generateKeys();
@@ -199,8 +235,10 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
         body: JSON.stringify(requestData),
       });
 
+      if (!isCurrent()) return;
       if (response.status === 200) {
         const data = await response.json();
+        if (!isCurrent()) return;
         const client = data.payload.client;
         const configFile = `
 [Interface]
@@ -231,16 +269,19 @@ PersistentKeepalive = 16`;
         onClientCreated({ configFile, vpnConfig });
       } else {
         const errorText = await response.text();
+        if (!isCurrent()) return;
         console.error('Failed to create VPN client:', errorText);
         Alert.alert('Error', `Failed to create VPN client: ${errorText}`);
       }
     } catch (error: any) {
+      if (!isCurrent()) return;
       console.error('Failed to create VPN client:', error);
       let errorMessage = 'Failed to create VPN client: ';
       errorMessage += error.message || 'Unknown error occurred';
       Alert.alert('Error', errorMessage);
     } finally {
-      setIsCreatingClient(false);
+      creationInFlight.current = false;
+      if (mounted.current) setIsCreatingClient(false);
     }
   }, [apiConfig, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
 
@@ -497,4 +538,4 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-}); 
+});

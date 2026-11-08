@@ -95,3 +95,55 @@ describe('VPNProvider native operation ownership', () => {
     expect(native.disconnect).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('VPNProvider status result ordering', () => {
+  let renderer, current;
+  beforeEach(async () => {
+    jest.resetAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    native.getStatus.mockResolvedValue({ isConnected: false });
+    function Consumer() { current = useVPN(); return null; }
+    await act(async () => { renderer = create(React.createElement(VPNProvider, null, React.createElement(Consumer))); });
+  });
+  afterEach(() => { if (renderer) act(() => renderer.unmount()); jest.restoreAllMocks(); });
+
+  test('keeps the newest status when refreshes complete out of order', async () => {
+    const old = deferred(), latest = deferred();
+    native.getStatus.mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise);
+    let first, second;
+    act(() => { first = current.updateStatus(); second = current.updateStatus(); });
+    await act(async () => { latest.resolve({ isConnected: true }); await second; });
+    await act(async () => { old.resolve({ isConnected: false }); await first; });
+    expect(current.vpnStatus.isConnected).toBe(true);
+  });
+
+  test('does not accept an old success after the latest refresh fails', async () => {
+    const old = deferred(), latest = deferred();
+    native.getStatus.mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise);
+    let first, second;
+    act(() => { first = current.updateStatus(); second = current.updateStatus(); });
+    await act(async () => { latest.reject(new Error('current failure')); await second; });
+    await act(async () => { old.resolve({ isConnected: true }); await first; });
+    expect(current.vpnStatus.isConnected).toBe(false);
+    expect(console.error).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not let a pre-connect refresh overwrite the connected status', async () => {
+    const old = deferred(); native.getStatus.mockReturnValueOnce(old.promise);
+    let first;
+    act(() => { first = current.updateStatus(); });
+    native.getStatus.mockResolvedValueOnce({ isConnected: true });
+    await act(async () => { await current.connectVPN(config); });
+    await act(async () => { old.resolve({ isConnected: false }); await first; });
+    expect(current.vpnStatus.isConnected).toBe(true);
+  });
+
+  test('ignores failures after unmount', async () => {
+    const old = deferred(); native.getStatus.mockReturnValueOnce(old.promise);
+    let pending;
+    act(() => { pending = current.updateStatus(); renderer.unmount(); });
+    renderer = null;
+    await act(async () => { old.reject(new Error('obsolete')); await pending; });
+    expect(console.error).not.toHaveBeenCalled();
+  });
+});

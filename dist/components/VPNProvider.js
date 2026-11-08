@@ -54,6 +54,8 @@ const VPNProvider = ({ children }) => {
     const [isConnecting, setIsConnecting] = (0, react_1.useState)(false);
     const [isDisconnecting, setIsDisconnecting] = (0, react_1.useState)(false);
     const [isInitialized, setIsInitialized] = (0, react_1.useState)(false);
+    const mounted = (0, react_1.useRef)(false);
+    const statusRequest = (0, react_1.useRef)(0);
     const operation = (0, react_1.useRef)(null);
     const initializeVPN = (0, react_1.useCallback)(async () => {
         try {
@@ -67,12 +69,18 @@ const VPNProvider = ({ children }) => {
         }
     }, []);
     const updateStatus = (0, react_1.useCallback)(async () => {
+        if (!mounted.current)
+            return;
+        const request = ++statusRequest.current;
         try {
             const status = await react_native_wireguard_vpn_connect_1.default.getStatus();
-            setVpnStatus(status);
+            if (mounted.current && request === statusRequest.current)
+                setVpnStatus(status);
         }
         catch (error) {
-            console.error("Failed to get VPN status:", error);
+            if (mounted.current && request === statusRequest.current) {
+                console.error("Failed to get VPN status:", error);
+            }
         }
     }, []);
     const connectVPN = (0, react_1.useCallback)(async (config) => {
@@ -123,7 +131,12 @@ const VPNProvider = ({ children }) => {
         }
     }, [updateStatus]);
     (0, react_1.useEffect)(() => {
+        mounted.current = true;
         initializeVPN();
+        return () => {
+            mounted.current = false;
+            statusRequest.current += 1;
+        };
     }, [initializeVPN]);
     const value = {
         vpnStatus,

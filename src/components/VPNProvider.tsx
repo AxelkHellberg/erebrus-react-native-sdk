@@ -44,6 +44,8 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const mounted = useRef(false);
+  const statusRequest = useRef(0);
   const operation = useRef<'connect' | 'disconnect' | null>(null);
 
   const initializeVPN = useCallback(async () => {
@@ -58,11 +60,15 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
   }, []);
 
   const updateStatus = useCallback(async () => {
+    if (!mounted.current) return;
+    const request = ++statusRequest.current;
     try {
       const status = await WireGuardVpnModule.getStatus();
-      setVpnStatus(status);
+      if (mounted.current && request === statusRequest.current) setVpnStatus(status);
     } catch (error: any) {
-      console.error("Failed to get VPN status:", error);
+      if (mounted.current && request === statusRequest.current) {
+        console.error("Failed to get VPN status:", error);
+      }
     }
   }, []);
 
@@ -113,7 +119,12 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
   }, [updateStatus]);
 
   useEffect(() => {
+    mounted.current = true;
     initializeVPN();
+    return () => {
+      mounted.current = false;
+      statusRequest.current += 1;
+    };
   }, [initializeVPN]);
 
   const value = {

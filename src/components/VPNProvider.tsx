@@ -2,6 +2,12 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import WireGuardVpnModule, { type WireGuardStatus } from "react-native-wireguard-vpn-connect";
 import { Alert } from 'react-native';
 
+const errorMessage = (error: unknown): string => {
+  const message = typeof error === 'string' ? error :
+    error !== null && typeof error === 'object' && 'message' in error ? error.message : undefined;
+  return typeof message === 'string' && message.trim() ? message : 'Unknown error occurred';
+};
+
 interface VPNConfig {
   privateKey: string;
   publicKey: string;
@@ -55,7 +61,7 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
     try {
       const status = await WireGuardVpnModule.getStatus();
       if (mounted.current && request === statusRequest.current) setVpnStatus(status);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (mounted.current && request === statusRequest.current) {
         console.error("Failed to get VPN status:", error);
       }
@@ -78,16 +84,16 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
 
       await WireGuardVpnModule.connect(config);
       if (isCurrent()) await updateStatus();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (!isCurrent()) return;
       console.error("Connection failed:", error);
-      let errorMessage = error.message || "Unknown error occurred";
-      if (errorMessage.includes("KeyFormat")) {
-        errorMessage = "Invalid key format";
-      } else if (errorMessage.includes("timeout")) {
-        errorMessage = "Connection timeout";
+      let message = errorMessage(error);
+      if (message.includes("KeyFormat")) {
+        message = "Invalid key format";
+      } else if (message.includes("timeout")) {
+        message = "Connection timeout";
       }
-      Alert.alert("Connection Failed", errorMessage);
+      Alert.alert("Connection Failed", message);
     } finally {
       operation.current = null;
       if (isCurrent()) setIsConnecting(false);
@@ -104,10 +110,10 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
     try {
       await WireGuardVpnModule.disconnect();
       if (isCurrent()) await updateStatus();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (!isCurrent()) return;
       console.error("Disconnection failed:", error);
-      Alert.alert("Disconnection Failed", error.message || "Unknown error occurred");
+      Alert.alert("Disconnection Failed", errorMessage(error));
     } finally {
       operation.current = null;
       if (isCurrent()) setIsDisconnecting(false);
@@ -124,10 +130,10 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
         if (!isCurrent()) return;
         setIsInitialized(true);
         await updateStatus();
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (!isCurrent()) return;
         console.error("VPN initialization failed:", error);
-        Alert.alert("Initialization Error", error.message || "Unknown error occurred");
+        Alert.alert("Initialization Error", errorMessage(error));
       }
     };
     void initializeVPN();

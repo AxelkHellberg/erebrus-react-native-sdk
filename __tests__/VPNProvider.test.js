@@ -213,3 +213,51 @@ describe('VPNProvider unmount lifecycle', () => {
     expect(native.disconnect).toHaveBeenCalledTimes(1);
   });
 });
+
+
+describe('VPNProvider native error messages', () => {
+  let renderer, current;
+  const { Alert } = require('react-native');
+  beforeEach(async () => {
+    jest.resetAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    native.getStatus.mockResolvedValue({ isConnected: false });
+    function Consumer() { current = useVPN(); return null; }
+    await act(async () => { renderer = create(React.createElement(VPNProvider, null, React.createElement(Consumer))); });
+  });
+  afterEach(() => { act(() => renderer.unmount()); jest.restoreAllMocks(); });
+
+  test.each([
+    [null, 'Unknown error occurred'],
+    [undefined, 'Unknown error occurred'],
+    [{ message: 42 }, 'Unknown error occurred'],
+    [{ message: { reason: 'failed' } }, 'Unknown error occurred'],
+    [{ message: '   ' }, 'Unknown error occurred'],
+    ['native unavailable', 'native unavailable'],
+    [new Error('KeyFormat invalid'), 'Invalid key format'],
+    [new Error('request timeout'), 'Connection timeout'],
+  ])('handles connect rejection %p and releases ownership', async (error, expected) => {
+    native.connect.mockRejectedValueOnce(error);
+    await act(async () => { await expect(current.connectVPN(config)).resolves.toBeUndefined(); });
+    expect(Alert.alert).toHaveBeenCalledWith('Connection Failed', expected);
+    expect(current.isConnecting).toBe(false);
+    await act(async () => { await current.disconnectVPN(); });
+    expect(native.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([null, undefined, { message: [] }])('handles disconnect rejection %p', async error => {
+    native.disconnect.mockRejectedValueOnce(error);
+    await act(async () => { await expect(current.disconnectVPN()).resolves.toBeUndefined(); });
+    expect(Alert.alert).toHaveBeenCalledWith('Disconnection Failed', 'Unknown error occurred');
+    expect(current.isDisconnecting).toBe(false);
+  });
+
+  test.each([null, { message: 42 }])('handles initialization rejection %p', async error => {
+    act(() => renderer.unmount());
+    native.initialize.mockRejectedValueOnce(error);
+    function Consumer() { current = useVPN(); return null; }
+    await act(async () => { renderer = create(React.createElement(VPNProvider, null, React.createElement(Consumer))); });
+    expect(Alert.alert).toHaveBeenCalledWith('Initialization Error', 'Unknown error occurred');
+    expect(current.isInitialized).toBe(false);
+  });
+});

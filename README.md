@@ -334,6 +334,8 @@ The SDK includes TypeScript types for all components and functions:
 - `Theme`
 - `WireGuardStatus`
 
+
+Native failures with non-text messages use a text fallback in alerts; plain string failures and the existing key-format/timeout messages are supported.
 ## License
 
 MIT

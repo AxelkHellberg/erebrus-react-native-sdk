@@ -40,6 +40,11 @@ exports.VPNProvider = exports.useVPN = void 0;
 const react_1 = __importStar(require("react"));
 const react_native_wireguard_vpn_connect_1 = __importDefault(require("react-native-wireguard-vpn-connect"));
 const react_native_1 = require("react-native");
+const errorMessage = (error) => {
+    const message = typeof error === 'string' ? error :
+        error !== null && typeof error === 'object' && 'message' in error ? error.message : undefined;
+    return typeof message === 'string' && message.trim() ? message : 'Unknown error occurred';
+};
 const VPNContext = (0, react_1.createContext)(undefined);
 const useVPN = () => {
     const context = (0, react_1.useContext)(VPNContext);
@@ -93,14 +98,14 @@ const VPNProvider = ({ children }) => {
             if (!isCurrent())
                 return;
             console.error("Connection failed:", error);
-            let errorMessage = error.message || "Unknown error occurred";
-            if (errorMessage.includes("KeyFormat")) {
-                errorMessage = "Invalid key format";
+            let message = errorMessage(error);
+            if (message.includes("KeyFormat")) {
+                message = "Invalid key format";
             }
-            else if (errorMessage.includes("timeout")) {
-                errorMessage = "Connection timeout";
+            else if (message.includes("timeout")) {
+                message = "Connection timeout";
             }
-            react_native_1.Alert.alert("Connection Failed", errorMessage);
+            react_native_1.Alert.alert("Connection Failed", message);
         }
         finally {
             operation.current = null;
@@ -124,7 +129,7 @@ const VPNProvider = ({ children }) => {
             if (!isCurrent())
                 return;
             console.error("Disconnection failed:", error);
-            react_native_1.Alert.alert("Disconnection Failed", error.message || "Unknown error occurred");
+            react_native_1.Alert.alert("Disconnection Failed", errorMessage(error));
         }
         finally {
             operation.current = null;
@@ -148,7 +153,7 @@ const VPNProvider = ({ children }) => {
                 if (!isCurrent())
                     return;
                 console.error("VPN initialization failed:", error);
-                react_native_1.Alert.alert("Initialization Error", error.message || "Unknown error occurred");
+                react_native_1.Alert.alert("Initialization Error", errorMessage(error));
             }
         };
         void initializeVPN();

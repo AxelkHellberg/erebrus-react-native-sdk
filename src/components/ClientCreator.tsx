@@ -24,11 +24,11 @@ import { Auth } from './Auth';
 
 interface Node {
   id: string;
-  name: string;
+  name?: string;
   region: string;
   status: string;
-  chainName: string;
-  walletAddress: string;
+  chainName?: string;
+  walletAddress?: string;
 }
 
 interface Region {
@@ -178,10 +178,16 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
         });
         if (!active) return;
         if (response.status === 200) {
-          const payload = response.data.payload;
+          const payload: unknown = response.data?.payload;
+          if (!Array.isArray(payload)) throw new Error('Invalid node list response');
           const filteredNodes = payload.filter(
-            (node: Node) =>
-              node.status === 'active' && node.region !== undefined && node.region !== null && node.region.trim(),
+            (node): node is Node =>
+              node !== null && typeof node === 'object' &&
+              typeof node.id === 'string' && !!node.id.trim() &&
+              node.status === 'active' &&
+              typeof node.region === 'string' && !!node.region.trim() &&
+              (node.name === undefined || typeof node.name === 'string') &&
+              (node.chainName === undefined || typeof node.chainName === 'string'),
           );
           setNodesData(filteredNodes);
         } else {

@@ -198,4 +198,22 @@ describe('ClientCreator creation ownership', () => {
     expect(renderer.root.findAllByType('QRCode')).toHaveLength(1);
   });
 
+  test.each([
+    ['2001:db8::1', '[2001:db8::1]'],
+    ['[2001:db8::1]', '[2001:db8::1]'],
+    ['::1', '[::1]'],
+    ['vpn.test', 'vpn.test'],
+    ['192.0.2.1', '192.0.2.1'],
+  ])('exports an unambiguous peer endpoint for %s', async (endpoint, expectedHost) => {
+    const body = await result().json(); body.payload.endpoint = endpoint;
+    global.fetch.mockResolvedValueOnce({ status: 200, json: async () => body });
+    await act(async () => { await button().props.onPress(); });
+    expect(onClientCreated).toHaveBeenCalledTimes(1);
+    const delivered = onClientCreated.mock.calls[0][0];
+    expect(delivered.configFile.split('\n').find(line => line.startsWith('Endpoint = '))).toBe(`Endpoint = ${expectedHost}:51820`);
+    expect(delivered.vpnConfig.serverAddress).toBe(endpoint);
+    expect(delivered.vpnConfig.serverPort).toBe(51820);
+    expect(renderer.root.findByType('QRCode').props.value).toBe(delivered.configFile);
+  });
+
 });

@@ -49,6 +49,16 @@ const useVPN = () => {
     return context;
 };
 exports.useVPN = useVPN;
+function isVPNStatus(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+        return false;
+    const status = value;
+    // Native iOS uses state names beyond the TypeScript union. Keep those strings.
+    return typeof status.isConnected === 'boolean' &&
+        (status.tunnelState === undefined || typeof status.tunnelState === 'string') &&
+        (status.error === undefined || typeof status.error === 'string') &&
+        (status.vpnPermissionGranted === undefined || typeof status.vpnPermissionGranted === 'boolean');
+}
 const VPNProvider = ({ children }) => {
     const [vpnStatus, setVpnStatus] = (0, react_1.useState)(null);
     const [isConnecting, setIsConnecting] = (0, react_1.useState)(false);
@@ -63,7 +73,11 @@ const VPNProvider = ({ children }) => {
             return;
         const request = ++statusRequest.current;
         try {
-            const status = await react_native_wireguard_vpn_connect_1.default.getStatus();
+            const nativeStatus = await react_native_wireguard_vpn_connect_1.default.getStatus();
+            // Android can return a null error when an exception has no message.
+            const status = nativeStatus?.error === null ? { ...nativeStatus, error: undefined } : nativeStatus;
+            if (!isVPNStatus(status))
+                throw new Error('Invalid native VPN status');
             if (mounted.current && request === statusRequest.current)
                 setVpnStatus(status);
         }

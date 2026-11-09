@@ -39,6 +39,16 @@ interface VPNProviderProps {
   children: React.ReactNode;
 }
 
+function isVPNStatus(value: unknown): value is WireGuardStatus {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const status = value as Record<string, unknown>;
+  // Native iOS uses state names beyond the TypeScript union. Keep those strings.
+  return typeof status.isConnected === 'boolean' &&
+    (status.tunnelState === undefined || typeof status.tunnelState === 'string') &&
+    (status.error === undefined || typeof status.error === 'string') &&
+    (status.vpnPermissionGranted === undefined || typeof status.vpnPermissionGranted === 'boolean');
+}
+
 export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
   const [vpnStatus, setVpnStatus] = useState<WireGuardStatus | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -53,7 +63,10 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
     if (!mounted.current) return;
     const request = ++statusRequest.current;
     try {
-      const status = await WireGuardVpnModule.getStatus();
+      const nativeStatus = await WireGuardVpnModule.getStatus();
+      // Android can return a null error when an exception has no message.
+      const status = nativeStatus?.error === null ? { ...nativeStatus, error: undefined } : nativeStatus;
+      if (!isVPNStatus(status)) throw new Error('Invalid native VPN status');
       if (mounted.current && request === statusRequest.current) setVpnStatus(status);
     } catch (error: any) {
       if (mounted.current && request === statusRequest.current) {

@@ -68,6 +68,8 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
 }, }) => {
     const gatewayUrl = apiConfig.gatewayUrl.replace(/\/+$/, '') + '/';
     const [newClientName, setNewClientName] = (0, react_1.useState)('');
+    const clientName = newClientName.trim();
+    const isValidClientName = clientName.length > 0 && clientName.length <= 8;
     const [selectedRegion, setSelectedRegion] = (0, react_1.useState)('');
     const [isCreatingClient, setIsCreatingClient] = (0, react_1.useState)(false);
     const creationInFlight = (0, react_1.useRef)(false);
@@ -180,6 +182,10 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
             react_native_1.Alert.alert('Error', 'Please authenticate first');
             return;
         }
+        if (!isValidClientName) {
+            react_native_1.Alert.alert('Error', 'Client name must contain 1 to 8 characters');
+            return;
+        }
         const selectedNode = nodesData.find((n) => n.id === selectedNodeId);
         if (!selectedNode) {
             react_native_1.Alert.alert('Error', 'Please select a node first');
@@ -192,7 +198,7 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
         try {
             const keys = generateKeys();
             const requestData = {
-                name: newClientName,
+                name: clientName,
                 presharedKey: keys.preSharedKey,
                 publicKey: keys.pubKey,
             };
@@ -265,7 +271,7 @@ PersistentKeepalive = 16`;
             if (mounted.current)
                 setIsCreatingClient(false);
         }
-    }, [gatewayUrl, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
+    }, [gatewayUrl, token, selectedNodeId, clientName, isValidClientName, nodesData, onClientCreated]);
     return (<react_native_1.ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
       {!token ? (<Auth_1.Auth onTokenReceived={handleTokenReceived}/>) : (<>
           <react_native_1.View style={[styles.section, { backgroundColor: theme.surface }]}>
@@ -344,9 +350,9 @@ PersistentKeepalive = 16`;
                 styles.createButton,
                 {
                     backgroundColor: theme.primary,
-                    opacity: !newClientName || !selectedRegion || !selectedNodeId || isCreatingClient ? 0.5 : 1,
+                    opacity: !isValidClientName || !selectedRegion || !selectedNodeId || isCreatingClient ? 0.5 : 1,
                 },
-            ]} onPress={createVPNClient} disabled={!newClientName || !selectedRegion || !selectedNodeId || isCreatingClient}>
+            ]} onPress={createVPNClient} disabled={!isValidClientName || !selectedRegion || !selectedNodeId || isCreatingClient}>
                 {isCreatingClient ? (<react_native_1.ActivityIndicator color="#ffffff" size="small"/>) : (<react_native_1.Text style={styles.createButtonText}>Create Client</react_native_1.Text>)}
               </react_native_1.TouchableOpacity>
             </react_native_1.View>

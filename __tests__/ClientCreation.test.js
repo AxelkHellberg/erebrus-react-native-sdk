@@ -37,6 +37,26 @@ describe('ClientCreator creation ownership', () => {
   });
   afterEach(() => { if (renderer) act(() => renderer.unmount()); global.fetch = originalFetch; jest.restoreAllMocks(); });
 
+  test.each(['', '   ', '123456789'])('rejects invalid client name %j even through the callback', async name => {
+    act(() => { renderer.root.findByType('TextInput').props.onChangeText(name); });
+    const createButton = button();
+    expect(createButton.props.disabled).toBe(true);
+    global.fetch.mockResolvedValueOnce(result());
+    await act(async () => { await createButton.props.onPress(); });
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(onClientCreated).not.toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalledWith('Error', 'Client name must contain 1 to 8 characters');
+  });
+
+  test.each(['12345678', ' client '])('sends a valid trimmed client name %j', async name => {
+    act(() => { renderer.root.findByType('TextInput').props.onChangeText(name); });
+    expect(button().props.disabled).toBe(false);
+    global.fetch.mockResolvedValueOnce(result());
+    await act(async () => { await button().props.onPress(); });
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body).name).toBe(name.trim());
+    expect(onClientCreated).toHaveBeenCalledTimes(1);
+  });
+
   test('admits a single POST for two taps before React commits', async () => {
     const pending = deferred(); global.fetch.mockReturnValue(pending.promise);
     const press = button().props.onPress;

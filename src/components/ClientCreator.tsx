@@ -90,6 +90,8 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
 }) => {
   const gatewayUrl = apiConfig.gatewayUrl.replace(/\/+$/, '') + '/';
   const [newClientName, setNewClientName] = useState('');
+  const clientName = newClientName.trim();
+  const isValidClientName = clientName.length > 0 && clientName.length <= 8;
   const [selectedRegion, setSelectedRegion] = useState('');
   const [isCreatingClient, setIsCreatingClient] = useState(false);
   const creationInFlight = useRef(false);
@@ -205,6 +207,10 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
       Alert.alert('Error', 'Please authenticate first');
       return;
     }
+    if (!isValidClientName) {
+      Alert.alert('Error', 'Client name must contain 1 to 8 characters');
+      return;
+    }
     const selectedNode = nodesData.find((n) => n.id === selectedNodeId);
     if (!selectedNode) {
       Alert.alert('Error', 'Please select a node first');
@@ -217,7 +223,7 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
     try {
       const keys = generateKeys();
       const requestData = {
-        name: newClientName,
+        name: clientName,
         presharedKey: keys.preSharedKey,
         publicKey: keys.pubKey,
       };
@@ -284,7 +290,7 @@ PersistentKeepalive = 16`;
       creationInFlight.current = false;
       if (mounted.current) setIsCreatingClient(false);
     }
-  }, [gatewayUrl, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
+  }, [gatewayUrl, token, selectedNodeId, clientName, isValidClientName, nodesData, onClientCreated]);
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -411,11 +417,11 @@ PersistentKeepalive = 16`;
                   styles.createButton,
                   {
                     backgroundColor: theme.primary,
-                    opacity: !newClientName || !selectedRegion || !selectedNodeId || isCreatingClient ? 0.5 : 1,
+                    opacity: !isValidClientName || !selectedRegion || !selectedNodeId || isCreatingClient ? 0.5 : 1,
                   },
                 ]}
                 onPress={createVPNClient}
-                disabled={!newClientName || !selectedRegion || !selectedNodeId || isCreatingClient}
+                disabled={!isValidClientName || !selectedRegion || !selectedNodeId || isCreatingClient}
               >
                 {isCreatingClient ? (
                   <ActivityIndicator color="#ffffff" size="small" />

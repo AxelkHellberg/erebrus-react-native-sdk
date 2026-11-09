@@ -107,6 +107,42 @@ describe('VPNProvider status result ordering', () => {
   });
   afterEach(() => { if (renderer) act(() => renderer.unmount()); jest.restoreAllMocks(); });
 
+  test.each([null, [], {}, 'connected', { isConnected: 'false' },
+    { isConnected: 1 }, { isConnected: true, tunnelState: {} },
+    { isConnected: false, error: { message: 'offline' } },
+    { isConnected: false, vpnPermissionGranted: 'yes' },
+  ])('rejects malformed native status %j without replacing the last valid status', async status => {
+    native.getStatus.mockResolvedValueOnce(status);
+    await act(async () => { await current.updateStatus(); });
+    expect(current.vpnStatus).toEqual({ isConnected: false });
+    expect(console.error).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['UP', 'CONNECTED', 'INACTIVE'])('retains native platform tunnel state %s', async tunnelState => {
+    const status = { isConnected: true, tunnelState, error: '', vpnPermissionGranted: true };
+    native.getStatus.mockResolvedValueOnce(status);
+    await act(async () => { await current.updateStatus(); });
+    expect(current.vpnStatus).toEqual(status);
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  test('accepts Android ERROR statuses with a null exception message', async () => {
+    native.getStatus.mockResolvedValueOnce({ isConnected: false, tunnelState: 'ERROR', error: null });
+    await act(async () => { await current.updateStatus(); });
+    expect(current.vpnStatus).toEqual({ isConnected: false, tunnelState: 'ERROR' });
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  test('a malformed newest status cannot admit an older response', async () => {
+    const old = deferred();
+    native.getStatus.mockReturnValueOnce(old.promise).mockResolvedValueOnce({ isConnected: 'false' });
+    let pending;
+    act(() => { pending = current.updateStatus(); });
+    await act(async () => { await current.updateStatus(); });
+    await act(async () => { old.resolve({ isConnected: true }); await pending; });
+    expect(current.vpnStatus).toEqual({ isConnected: false });
+  });
+
   test('keeps the newest status when refreshes complete out of order', async () => {
     const old = deferred(), latest = deferred();
     native.getStatus.mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise);

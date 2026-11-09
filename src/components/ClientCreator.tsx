@@ -165,11 +165,14 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
       setIsLoadingNodes(false);
       return;
     }
+    const controller = new AbortController();
     const fetchNodesData = async () => {
       setIsLoadingNodes(true);
       setNodesError(null);
       try {
         const response = await axios.get(`${gatewayUrl}api/v1.0/nodes/all`, {
+          timeout: 30000,
+          signal: controller.signal,
           headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
@@ -202,7 +205,10 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
       }
     };
     void fetchNodesData();
-    return () => { active = false; };
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [gatewayUrl, token]);
 
   const createVPNClient = useCallback(async () => {

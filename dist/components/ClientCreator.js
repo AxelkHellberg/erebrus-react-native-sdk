@@ -137,11 +137,14 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
             setIsLoadingNodes(false);
             return;
         }
+        const controller = new AbortController();
         const fetchNodesData = async () => {
             setIsLoadingNodes(true);
             setNodesError(null);
             try {
                 const response = await axios_1.default.get(`${gatewayUrl}api/v1.0/nodes/all`, {
+                    timeout: 30000,
+                    signal: controller.signal,
                     headers: {
                         Accept: 'application/json',
                         'Content-Type': 'application/json',
@@ -178,7 +181,10 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
             }
         };
         void fetchNodesData();
-        return () => { active = false; };
+        return () => {
+            active = false;
+            controller.abort();
+        };
     }, [gatewayUrl, token]);
     const createVPNClient = (0, react_1.useCallback)(async () => {
         if (creationInFlight.current || !mounted.current)

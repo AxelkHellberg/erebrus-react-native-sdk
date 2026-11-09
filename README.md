@@ -343,6 +343,8 @@ The SDK includes TypeScript types for all components and functions:
 - `Theme`
 - `WireGuardStatus`
 
+
+Generated WireGuard text configurations bracket IPv6 peer endpoints (for example, `[2001:db8::1]:51820`). The separate `vpnConfig.serverAddress` value is preserved; native IPv6 tunnel support still depends on the platform module.
 ## License
 
 MIT

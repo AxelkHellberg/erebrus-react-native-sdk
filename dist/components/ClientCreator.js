@@ -223,6 +223,10 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
                     !isText(payload?.endpoint)) {
                     throw new Error('Invalid VPN client response');
                 }
+                // WireGuard text endpoints need brackets around IPv6 literals.
+                const endpoint = payload.endpoint;
+                const endpointHost = endpoint.includes(':') &&
+                    !(endpoint.startsWith('[') && endpoint.endsWith(']')) ? `[${endpoint}]` : endpoint;
                 const configFile = `
 [Interface]
 Address = ${client.Address[0]}
@@ -233,7 +237,7 @@ DNS = 1.1.1.1
 PublicKey = ${data.payload.serverPublicKey}
 PresharedKey = ${client.PresharedKey}
 AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = ${data.payload.endpoint}:51820
+Endpoint = ${endpointHost}:51820
 PersistentKeepalive = 16`;
                 setConfigFile(configFile);
                 setShowQrCode(true);

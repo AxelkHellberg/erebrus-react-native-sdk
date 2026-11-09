@@ -45,14 +45,15 @@ export const Auth: React.FC<AuthProps> = ({
       const orgData = await orgRes.json();
       if (!isCurrent()) return;
       if (!orgRes.ok) {
-        const msg = orgData?.message || 'Failed to create organization';
+        const msg = typeof orgData?.message === 'string' && orgData.message.trim()
+          ? orgData.message : 'Failed to create organization';
         setErrorMsg(msg);
         setStatus('error');
         console.error('Org creation error:', orgData);
         return;
       }
-      const apiKey = orgData.api_key;
-      if (!apiKey) {
+      const apiKey = orgData?.api_key;
+      if (typeof apiKey !== 'string' || !apiKey.trim()) {
         setErrorMsg('No API key returned');
         setStatus('error');
         console.error('No API key in orgData:', orgData);
@@ -68,14 +69,15 @@ export const Auth: React.FC<AuthProps> = ({
       const tokenData = await tokenRes.json();
       if (!isCurrent()) return;
       if (!tokenRes.ok) {
-        const msg = tokenData?.message || 'Failed to generate token';
+        const msg = typeof tokenData?.message === 'string' && tokenData.message.trim()
+          ? tokenData.message : 'Failed to generate token';
         setErrorMsg(msg);
         setStatus('error');
         console.error('Token generation error:', tokenData);
         return;
       }
       const token = tokenData?.payload?.token || tokenData?.payload?.Token;
-      if (!token) {
+      if (typeof token !== 'string' || !token.trim()) {
         setErrorMsg('No token returned');
         setStatus('error');
         console.error('No token in tokenData:', tokenData);

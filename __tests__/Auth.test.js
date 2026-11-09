@@ -151,4 +151,48 @@ describe('Auth gateway ownership', () => {
     expect(global.fetch.mock.calls[1][0]).toBe('https://new.test/api/v1.1/organisation');
     expect(onTokenReceived).toHaveBeenCalledTimes(1);
   });
+  test.each([{}, [], 42, true, '   '])('rejects malformed organization key %j before requesting a token', async value => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch.mockReset().mockResolvedValueOnce({ ok: true, json: async () => ({ api_key: value }) }).mockResolvedValueOnce(token());
+    await act(async () => { renderer = create(render('https://one.test/')); });
+    await act(async () => { await press(); });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(onTokenReceived).not.toHaveBeenCalled();
+    expect(renderer.root.findByType('TouchableOpacity').props.disabled).toBe(false);
+    jest.restoreAllMocks();
+  });
+
+  test.each([{}, [], 42, true, '   '])('does not deliver malformed token %j', async value => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch.mockReset().mockResolvedValueOnce(org()).mockResolvedValueOnce({ ok: true, json: async () => ({ payload: { token: value } }) });
+    await act(async () => { renderer = create(render('https://one.test/')); });
+    await act(async () => { await press(); });
+    expect(onTokenReceived).not.toHaveBeenCalled();
+    expect(renderer.root.findByType('TouchableOpacity').props.disabled).toBe(false);
+    jest.restoreAllMocks();
+  });
+
+  test.each(['organization', 'token'])('renders a safe fallback for a non-text %s error message', async phase => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const invalid = { ok: false, json: async () => ({ message: { detail: 'unavailable' } }) };
+    global.fetch.mockReset();
+    if (phase === 'token') global.fetch.mockResolvedValueOnce(org());
+    global.fetch.mockResolvedValueOnce(invalid);
+    await act(async () => { renderer = create(render('https://one.test/')); });
+    await act(async () => { await press(); });
+    const texts = renderer.root.findAllByType('Text').map(t => t.props.children);
+    expect(texts).toContain(phase === 'organization' ? 'Failed to create organization' : 'Failed to generate token');
+    expect(onTokenReceived).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  test('accepts the legacy Token field and preserves credential bytes', async () => {
+    global.fetch.mockReset().mockResolvedValueOnce({ ok: true, json: async () => ({ api_key: ' key ' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ payload: { Token: ' token ' } }) });
+    await act(async () => { renderer = create(render('https://one.test/')); });
+    await act(async () => { await press(); });
+    expect(global.fetch.mock.calls[1][1].headers['X-ORG-API-KEY']).toBe(' key ');
+    expect(onTokenReceived).toHaveBeenCalledWith(' token ');
+  });
+
 });

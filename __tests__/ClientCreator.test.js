@@ -38,6 +38,43 @@ describe('ClientCreator node request ownership', () => {
   });
   afterEach(() => { if (renderer) act(() => renderer.unmount()); jest.restoreAllMocks(); });
 
+  test('gives a node lookup a finite network timeout', async () => {
+    await act(async () => { renderer = create(render({ token: 'first', gatewayUrl: 'https://one.test/' })); });
+    expect(axios.get.mock.calls[0][1].timeout).toBe(30000);
+    expect(axios.get.mock.calls[0][1].signal.aborted).toBe(false);
+  });
+
+  test.each(['token', 'gateway', 'logout', 'unmount'])('aborts an outstanding lookup on %s', async change => {
+    axios.get.mockImplementationOnce((url, options) => new Promise((resolve, reject) => {
+      options.signal?.addEventListener('abort', () => reject(new Error('cancelled')));
+    }));
+    await act(async () => { renderer = create(render({ token: 'first', gatewayUrl: 'https://one.test/' })); });
+    const signal = axios.get.mock.calls[0][1].signal;
+    if (change === 'unmount') {
+      await act(async () => { renderer.unmount(); });
+      renderer = null;
+    } else {
+      await act(async () => { renderer.update(render({
+        token: change === 'logout' ? '' : change === 'token' ? 'next' : 'first',
+        gatewayUrl: change === 'gateway' ? 'https://two.test/' : 'https://one.test/',
+      })); });
+    }
+    expect(signal?.aborted).toBe(true);
+    expect(console.error).not.toHaveBeenCalled();
+    if (change === 'token' || change === 'gateway') {
+      expect(axios.get.mock.calls[1][1].signal.aborted).toBe(false);
+      selectUS();
+      expect(nodes()).toEqual(['initial']);
+    }
+  });
+
+  test('ends the loading state when the lookup times out', async () => {
+    axios.get.mockRejectedValueOnce(Object.assign(new Error('timeout'), { code: 'ECONNABORTED' }));
+    await act(async () => { renderer = create(render({ token: 'first', gatewayUrl: 'https://one.test/' })); });
+    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
+    expect(renderer.root.findAllByType('Text').map(t => t.props.children)).toContain('Failed to fetch available nodes');
+  });
+
   test('does not refetch when the caller recreates an equivalent apiConfig', async () => {
     await act(async () => { renderer = create(render({ token: 'first', gatewayUrl: 'https://one.test/' })); });
     await act(async () => { renderer.update(render({ token: 'first', gatewayUrl: 'https://one.test/' })); });

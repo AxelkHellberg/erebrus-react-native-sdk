@@ -215,7 +215,14 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
                 const data = await response.json();
                 if (!isCurrent())
                     return;
-                const client = data.payload.client;
+                const payload = data?.payload;
+                const client = payload?.client;
+                const isText = (value) => typeof value === 'string' && value.trim().length > 0;
+                if (!Array.isArray(client?.Address) || !isText(client.Address[0]) ||
+                    !isText(client.PresharedKey) || !isText(payload?.serverPublicKey) ||
+                    !isText(payload?.endpoint)) {
+                    throw new Error('Invalid VPN client response');
+                }
                 const configFile = `
 [Interface]
 Address = ${client.Address[0]}

@@ -168,4 +168,34 @@ describe('ClientCreator creation ownership', () => {
     expect(onClientCreated).toHaveBeenCalledTimes(1);
   });
 
+  test.each([
+    ['string address', body => { body.payload.client.Address = '10.0.0.2/32'; }],
+    ['empty addresses', body => { body.payload.client.Address = []; }],
+    ['non-text address', body => { body.payload.client.Address = [42]; }],
+    ['blank address', body => { body.payload.client.Address = ['  ']; }],
+    ['missing server key', body => { delete body.payload.serverPublicKey; }],
+    ['non-text server key', body => { body.payload.serverPublicKey = {}; }],
+    ['missing endpoint', body => { delete body.payload.endpoint; }],
+    ['blank endpoint', body => { body.payload.endpoint = '  '; }],
+    ['non-text preshared key', body => { body.payload.client.PresharedKey = []; }],
+    ['missing client', body => { delete body.payload.client; }],
+  ])('rejects %s without displaying or delivering a configuration', async (_name, corrupt) => {
+    const body = await result().json(); corrupt(body);
+    global.fetch.mockResolvedValueOnce({ status: 200, json: async () => body });
+    await act(async () => { await button().props.onPress(); });
+    expect(onClientCreated).not.toHaveBeenCalled();
+    expect(renderer.root.findAllByType('QRCode')).toHaveLength(0);
+    expect(Alert.alert).toHaveBeenCalledWith('Error', 'Failed to create VPN client: Invalid VPN client response');
+    // No automatic retry: the server might already have created this client.
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(button().props.disabled).toBe(false);
+  });
+
+  test('passes a valid tunnel through without changing its values', async () => {
+    global.fetch.mockResolvedValueOnce(result());
+    await act(async () => { await button().props.onPress(); });
+    expect(onClientCreated.mock.calls[0][0].vpnConfig).toMatchObject({ address: '10.0.0.2/32', serverAddress: 'vpn.test', publicKey: 'server', presharedKey: 'psk' });
+    expect(renderer.root.findAllByType('QRCode')).toHaveLength(1);
+  });
+
 });

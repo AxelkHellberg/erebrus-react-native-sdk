@@ -334,6 +334,8 @@ The SDK includes TypeScript types for all components and functions:
 - `Theme`
 - `WireGuardStatus`
 
+
+Before connecting, the provider checks required native fields, nonempty allowed-IP lists, port range (1–65535), optional DNS/preshared-key types, and the Android-supported MTU range (1280–65535). Invalid configurations produce an alert without starting native connection work. This validates value shapes; native parsing still validates keys and IP syntax.
 ## License
 
 MIT

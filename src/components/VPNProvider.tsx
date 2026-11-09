@@ -15,6 +15,24 @@ interface VPNConfig {
   persistentKeepalive?: number;
 }
 
+const isText = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+const isTextList = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every(isText);
+
+// Validate values crossing the native bridge, including calls from JavaScript consumers.
+const isNativeConfig = (value: unknown): boolean => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const config = value as VPNConfig;
+  return isText(config.privateKey) && isText(config.publicKey) &&
+    isText(config.serverAddress) && Number.isInteger(config.serverPort) &&
+    config.serverPort >= 1 && config.serverPort <= 65535 &&
+    isTextList(config.allowedIPs) && config.allowedIPs.length > 0 &&
+    (config.dns === undefined || isTextList(config.dns)) &&
+    (config.mtu === undefined || (Number.isInteger(config.mtu) && config.mtu >= 1280 && config.mtu <= 65535)) &&
+    (config.presharedKey === undefined || typeof config.presharedKey === 'string');
+};
+
 interface VPNContextType {
   vpnStatus: WireGuardStatus | null;
   isConnecting: boolean;
@@ -72,8 +90,8 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
     operation.current = 'connect';
     setIsConnecting(true);
     try {
-      if (!config.privateKey || !config.publicKey) {
-        throw new Error("Invalid cryptographic keys");
+      if (!isNativeConfig(config)) {
+        throw new Error("Invalid VPN configuration");
       }
 
       await WireGuardVpnModule.connect(config);

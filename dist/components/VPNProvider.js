@@ -40,6 +40,21 @@ exports.VPNProvider = exports.useVPN = void 0;
 const react_1 = __importStar(require("react"));
 const react_native_wireguard_vpn_connect_1 = __importDefault(require("react-native-wireguard-vpn-connect"));
 const react_native_1 = require("react-native");
+const isText = (value) => typeof value === 'string' && value.trim().length > 0;
+const isTextList = (value) => Array.isArray(value) && value.every(isText);
+// Validate values crossing the native bridge, including calls from JavaScript consumers.
+const isNativeConfig = (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+        return false;
+    const config = value;
+    return isText(config.privateKey) && isText(config.publicKey) &&
+        isText(config.serverAddress) && Number.isInteger(config.serverPort) &&
+        config.serverPort >= 1 && config.serverPort <= 65535 &&
+        isTextList(config.allowedIPs) && config.allowedIPs.length > 0 &&
+        (config.dns === undefined || isTextList(config.dns)) &&
+        (config.mtu === undefined || (Number.isInteger(config.mtu) && config.mtu >= 1280 && config.mtu <= 65535)) &&
+        (config.presharedKey === undefined || typeof config.presharedKey === 'string');
+};
 const VPNContext = (0, react_1.createContext)(undefined);
 const useVPN = () => {
     const context = (0, react_1.useContext)(VPNContext);
@@ -82,8 +97,8 @@ const VPNProvider = ({ children }) => {
         operation.current = 'connect';
         setIsConnecting(true);
         try {
-            if (!config.privateKey || !config.publicKey) {
-                throw new Error("Invalid cryptographic keys");
+            if (!isNativeConfig(config)) {
+                throw new Error("Invalid VPN configuration");
             }
             await react_native_wireguard_vpn_connect_1.default.connect(config);
             if (isCurrent())

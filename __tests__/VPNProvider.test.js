@@ -213,3 +213,45 @@ describe('VPNProvider unmount lifecycle', () => {
     expect(native.disconnect).toHaveBeenCalledTimes(1);
   });
 });
+
+
+describe('VPNProvider configuration boundary', () => {
+  let renderer, current;
+  const { Alert } = require('react-native');
+  beforeEach(async () => {
+    jest.resetAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    native.getStatus.mockResolvedValue({ isConnected: false });
+    function Consumer() { current = useVPN(); return null; }
+    await act(async () => { renderer = create(React.createElement(VPNProvider, null, React.createElement(Consumer))); });
+  });
+  afterEach(() => { act(() => renderer.unmount()); jest.restoreAllMocks(); });
+
+  test.each([
+    null, undefined, [],
+    { ...config, privateKey: 42 }, { ...config, publicKey: '  ' },
+    { ...config, serverAddress: '' }, { ...config, serverAddress: {} },
+    { ...config, serverPort: 0 }, { ...config, serverPort: 65536 },
+    { ...config, serverPort: 1.5 }, { ...config, serverPort: '51820' },
+    { ...config, serverPort: NaN }, { ...config, serverPort: Infinity },
+    { ...config, allowedIPs: [] }, { ...config, allowedIPs: '0.0.0.0/0' },
+    { ...config, allowedIPs: ['0.0.0.0/0', null] },
+    { ...config, dns: [42] }, { ...config, dns: '1.1.1.1' },
+    { ...config, mtu: 1279 }, { ...config, mtu: 65536 }, { ...config, mtu: 1280.5 },
+    { ...config, presharedKey: 42 },
+  ])('rejects malformed configuration %p before native work', async invalid => {
+    await act(async () => { await current.connectVPN(invalid); });
+    expect(native.connect).not.toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalledWith('Connection Failed', expect.any(String));
+    expect(current.isConnecting).toBe(false);
+    await act(async () => { await current.connectVPN(config); });
+    expect(native.connect).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([1, 65535])('passes a valid port boundary %p unchanged', async port => {
+    const valid = { ...config, serverPort: port, dns: [], mtu: 1280, presharedKey: '' };
+    await act(async () => { await current.connectVPN(valid); });
+    expect(native.connect).toHaveBeenCalledWith(valid);
+    expect(Alert.alert).not.toHaveBeenCalled();
+  });
+});

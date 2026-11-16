@@ -48,6 +48,11 @@ const axios_1 = __importDefault(require("axios"));
 const curve25519_js_1 = require("curve25519-js");
 const react_native_qrcode_svg_1 = __importDefault(require("react-native-qrcode-svg"));
 const Auth_1 = require("./Auth");
+const clientCreationErrorMessage = (error) => {
+    const message = typeof error === 'string' ? error :
+        error !== null && typeof error === 'object' && 'message' in error ? error.message : undefined;
+    return typeof message === 'string' && message.trim() ? message : 'Unknown error occurred';
+};
 const REGIONS = [
     { id: "SG", name: "Singapore" },
     { id: "IN", name: "India" },
@@ -267,9 +272,7 @@ PersistentKeepalive = 16`;
             if (!isCurrent())
                 return;
             console.error('Failed to create VPN client:', error);
-            let errorMessage = 'Failed to create VPN client: ';
-            errorMessage += error.message || 'Unknown error occurred';
-            react_native_1.Alert.alert('Error', errorMessage);
+            react_native_1.Alert.alert('Error', `Failed to create VPN client: ${clientCreationErrorMessage(error)}`);
         }
         finally {
             creationInFlight.current = false;

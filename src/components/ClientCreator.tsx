@@ -20,8 +20,14 @@ import axios from 'axios';
 import { generateKeyPair } from 'curve25519-js';
 import QRCode from 'react-native-qrcode-svg';
 import { Auth } from './Auth';
-// @ts-ignore
 
+const clientCreationErrorMessage = (error: unknown): string => {
+  const message = typeof error === 'string' ? error :
+    error !== null && typeof error === 'object' && 'message' in error ? error.message : undefined;
+  return typeof message === 'string' && message.trim() ? message : 'Unknown error occurred';
+};
+
+// @ts-ignore
 interface Node {
   id: string;
   name: string;
@@ -286,12 +292,10 @@ PersistentKeepalive = 16`;
         console.error('Failed to create VPN client:', errorText);
         Alert.alert('Error', `Failed to create VPN client: ${errorText}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (!isCurrent()) return;
       console.error('Failed to create VPN client:', error);
-      let errorMessage = 'Failed to create VPN client: ';
-      errorMessage += error.message || 'Unknown error occurred';
-      Alert.alert('Error', errorMessage);
+      Alert.alert('Error', `Failed to create VPN client: ${clientCreationErrorMessage(error)}`);
     } finally {
       creationInFlight.current = false;
       if (mounted.current) setIsCreatingClient(false);

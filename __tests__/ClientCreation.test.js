@@ -216,4 +216,35 @@ describe('ClientCreator creation ownership', () => {
     expect(renderer.root.findByType('QRCode').props.value).toBe(delivered.configFile);
   });
 
+  describe.each(['network', 'body'])('%s failure reporting', phase => {
+    test.each([
+      ['null', null, 'Unknown error occurred'],
+      ['undefined', undefined, 'Unknown error occurred'],
+      ['plain text', 'offline', 'offline'],
+      ['Error', new Error('connection lost'), 'connection lost'],
+      ['text message', { message: 'request failed' }, 'request failed'],
+      ['structured message', { message: { detail: 'unavailable' } }, 'Unknown error occurred'],
+      ['numeric rejection', 503, 'Unknown error occurred'],
+      ['blank message', { message: '  ' }, 'Unknown error occurred'],
+      ['blank text', '', 'Unknown error occurred'],
+    ])('handles %s and permits a later manual attempt', async (_name, failure, expectedMessage) => {
+      if (phase === 'network') global.fetch.mockRejectedValueOnce(failure);
+      else global.fetch.mockResolvedValueOnce({ status: 200, json: async () => { throw failure; } });
+
+      await act(async () => { await expect(button().props.onPress()).resolves.toBeUndefined(); });
+      expect(Alert.alert).toHaveBeenCalledWith('Error', `Failed to create VPN client: ${expectedMessage}`);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(onClientCreated).not.toHaveBeenCalled();
+      expect(renderer.root.findAllByType('QRCode')).toHaveLength(0);
+      expect(button().props.disabled).toBe(false);
+
+      // The server may have accepted the first request; retry only on a new user action.
+      global.fetch.mockResolvedValueOnce(result());
+      await act(async () => { await button().props.onPress(); });
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(onClientCreated).toHaveBeenCalledTimes(1);
+      expect(Alert.alert).toHaveBeenCalledTimes(1);
+    });
+  });
+
 });

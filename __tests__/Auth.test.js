@@ -195,4 +195,40 @@ describe('Auth gateway ownership', () => {
     expect(onTokenReceived).toHaveBeenCalledWith(' token ');
   });
 
+  describe.each(['organization request', 'organization body', 'token request', 'token body'])('unknown failures during %s', phase => {
+    test.each([
+      ['null', null, 'Unknown error'],
+      ['structured message', { message: { detail: 'offline' } }, 'Unknown error'],
+      ['numeric message', { message: 42 }, 'Unknown error'],
+      ['blank message', { message: '   ' }, 'Unknown error'],
+      ['plain string', ' offline ', ' offline '],
+      ['Error instance', new Error('offline'), 'offline'],
+    ])('renders %s as text and allows a later manual attempt', async (_label, failure, expected) => {
+      const diagnostic = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        global.fetch.mockReset();
+        if (phase.startsWith('token')) global.fetch.mockResolvedValueOnce(org());
+        if (phase.endsWith('body')) {
+          global.fetch.mockResolvedValueOnce({ ok: true, json: async () => { throw failure; } });
+        } else {
+          global.fetch.mockRejectedValueOnce(failure);
+        }
+        await act(async () => { renderer = create(render('https://one.test/')); });
+        await act(async () => { await press(); });
+        const texts = renderer.root.findAllByType('Text').map(t => t.props.children);
+        expect(texts).toContain(expected);
+        expect(onTokenReceived).not.toHaveBeenCalled();
+        expect(global.fetch).toHaveBeenCalledTimes(phase.startsWith('token') ? 2 : 1);
+        expect(renderer.root.findByType('TouchableOpacity').props.disabled).toBe(false);
+
+        global.fetch.mockResolvedValueOnce(org()).mockResolvedValueOnce(token());
+        await act(async () => { await press(); });
+        expect(onTokenReceived).toHaveBeenCalledTimes(1);
+        expect(onTokenReceived).toHaveBeenCalledWith('test-token');
+      } finally {
+        diagnostic.mockRestore();
+      }
+    });
+  });
+
 });

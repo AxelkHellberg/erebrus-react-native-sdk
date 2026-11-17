@@ -118,7 +118,9 @@ const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/
         catch (e) {
             if (!isCurrent())
                 return;
-            setErrorMsg(e?.message || 'Unknown error');
+            const message = typeof e === 'string' ? e
+                : e && typeof e === 'object' && 'message' in e ? e.message : undefined;
+            setErrorMsg(typeof message === 'string' && message.trim() ? message : 'Unknown error');
             setStatus('error');
             console.error('Auth error:', e);
         }

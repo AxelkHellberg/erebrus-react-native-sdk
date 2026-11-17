@@ -86,9 +86,11 @@ export const Auth: React.FC<AuthProps> = ({
 
       setStatus('success');
       onTokenReceived(token);
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (!isCurrent()) return;
-      setErrorMsg(e?.message || 'Unknown error');
+      const message = typeof e === 'string' ? e
+        : e && typeof e === 'object' && 'message' in e ? e.message : undefined;
+      setErrorMsg(typeof message === 'string' && message.trim() ? message : 'Unknown error');
       setStatus('error');
       console.error('Auth error:', e);
     } finally {

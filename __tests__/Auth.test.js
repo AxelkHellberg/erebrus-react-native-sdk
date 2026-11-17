@@ -231,4 +231,139 @@ describe('Auth gateway ownership', () => {
     });
   });
 
+  describe('authentication deadline', () => {
+    const phases = ['organization request', 'organization body', 'token request', 'token body'];
+    const stall = phase => {
+      let resolve;
+      const pending = new Promise(yes => { resolve = yes; });
+      global.fetch.mockReset();
+      if (phase.startsWith('token')) global.fetch.mockResolvedValueOnce(org());
+      if (phase.endsWith('body')) global.fetch.mockResolvedValueOnce({ ok: true, json: () => pending });
+      else global.fetch.mockReturnValueOnce(pending);
+      if (phase.startsWith('organization')) global.fetch.mockResolvedValueOnce(token());
+      return () => resolve(phase.endsWith('request')
+        ? phase.startsWith('organization') ? org() : token()
+        : phase.startsWith('organization') ? { api_key: 'test-api-key' } : { payload: { token: 'test-token' } });
+    };
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      if (renderer) act(() => renderer.unmount());
+      renderer = null;
+      jest.useRealTimers();
+      jest.restoreAllMocks();
+    });
+
+    test.each(phases)('bounds a stalled %s and ignores its late completion', async phase => {
+      const settle = stall(phase);
+      await act(async () => { renderer = create(render('https://one.test/')); });
+      let pending;
+      await act(async () => { pending = press(); });
+      try {
+        await act(async () => { await jest.advanceTimersByTimeAsync(30_000); });
+        expect(renderer.root.findByType('TouchableOpacity').props.disabled).toBe(false);
+        expect(renderer.root.findAllByType('Text').map(text => text.props.children)).toContain(
+          'Authentication timed out. The organization may already have been created. Check the gateway before trying again.');
+        expect(global.fetch).toHaveBeenCalledTimes(phase.startsWith('organization') ? 1 : 2);
+        expect(global.fetch.mock.calls.at(-1)[1].signal.aborted).toBe(true);
+        expect(onTokenReceived).not.toHaveBeenCalled();
+        await act(async () => { settle(); await pending; });
+        expect(global.fetch).toHaveBeenCalledTimes(phase.startsWith('organization') ? 1 : 2);
+        expect(onTokenReceived).not.toHaveBeenCalled();
+
+        global.fetch.mockReset().mockResolvedValueOnce(org()).mockResolvedValueOnce(token());
+        await act(async () => { await press(); });
+        expect(onTokenReceived).toHaveBeenCalledTimes(1);
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        await act(async () => { settle(); await pending; });
+      }
+    });
+
+    test.each(phases)('cancels a stalled %s and clears its deadline on unmount', async phase => {
+      const settle = stall(phase);
+      await act(async () => { renderer = create(render('https://one.test/')); });
+      let pending;
+      await act(async () => { pending = press(); });
+      const signal = global.fetch.mock.calls.at(-1)[1].signal;
+      try {
+        await act(async () => { renderer.unmount(); });
+        renderer = null;
+        expect(signal?.aborted).toBe(true);
+        expect(jest.getTimerCount()).toBe(0);
+        await act(async () => { settle(); await pending; });
+        expect(global.fetch).toHaveBeenCalledTimes(phase.startsWith('organization') ? 1 : 2);
+        expect(onTokenReceived).not.toHaveBeenCalled();
+      } finally {
+        await act(async () => { settle(); await pending; });
+      }
+    });
+
+    test('keeps one deadline across request and body phases', async () => {
+      let resolveOrganization;
+      global.fetch.mockReset().mockReturnValueOnce(new Promise(resolve => { resolveOrganization = resolve; }))
+        .mockReturnValueOnce(new Promise(() => {}));
+      await act(async () => { renderer = create(render('https://one.test/')); });
+      let pending;
+      await act(async () => { pending = press(); });
+      await act(async () => { await jest.advanceTimersByTimeAsync(20_000); resolveOrganization(org()); });
+      await act(async () => { await jest.advanceTimersByTimeAsync(9_999); });
+      expect(renderer.root.findByType('TouchableOpacity').props.disabled).toBe(true);
+      await act(async () => { await jest.advanceTimersByTimeAsync(1); });
+      expect(renderer.root.findByType('TouchableOpacity').props.disabled).toBe(false);
+      await pending;
+      expect(onTokenReceived).not.toHaveBeenCalled();
+    });
+
+    test('releases an obsolete gateway flow only when its bounded wait ends', async () => {
+      const settle = stall('organization request');
+      await act(async () => { renderer = create(render('https://old.test/')); });
+      let pending;
+      await act(async () => { pending = press(); renderer.update(render('https://new.test/')); });
+      await act(async () => { await press(); });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      await act(async () => { await jest.advanceTimersByTimeAsync(30_000); });
+      expect(renderer.root.findByType('TouchableOpacity').props.disabled).toBe(false);
+      await act(async () => { settle(); await pending; });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(onTokenReceived).not.toHaveBeenCalled();
+      global.fetch.mockReset().mockResolvedValueOnce(org()).mockResolvedValueOnce(token());
+      await act(async () => { await press(); });
+      expect(global.fetch.mock.calls[0][0]).toBe('https://new.test/api/v1.1/organisation');
+      expect(onTokenReceived).toHaveBeenCalledTimes(1);
+    });
+
+    test('clears the deadline after successful authentication', async () => {
+      await act(async () => { renderer = create(render('https://one.test/')); });
+      await act(async () => { await press(); });
+      expect(jest.getTimerCount()).toBe(0);
+      expect(global.fetch.mock.calls[0][1].signal.aborted).toBe(false);
+      await act(async () => { await jest.advanceTimersByTimeAsync(30_000); });
+      expect(onTokenReceived).toHaveBeenCalledTimes(1);
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    test('bounds waits even when AbortController is unavailable', async () => {
+      const originalAbortController = global.AbortController;
+      const settle = stall('organization request');
+      let pending;
+      try {
+        global.AbortController = undefined;
+        await act(async () => { renderer = create(render('https://one.test/')); });
+        await act(async () => { pending = press(); });
+        await act(async () => { await jest.advanceTimersByTimeAsync(30_000); });
+        expect(renderer.root.findByType('TouchableOpacity').props.disabled).toBe(false);
+        await act(async () => { settle(); await pending; });
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+        expect(onTokenReceived).not.toHaveBeenCalled();
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        global.AbortController = originalAbortController;
+        await act(async () => { settle(); await pending; });
+      }
+    });
+  });
+
 });

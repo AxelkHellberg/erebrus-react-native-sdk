@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Auth = void 0;
 const react_1 = __importStar(require("react"));
 const react_native_1 = require("react-native");
+const AUTH_TIMEOUT_MS = 30_000;
 const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/', }) => {
     const [isLoading, setIsLoading] = (0, react_1.useState)(false);
     const [status, setStatus] = (0, react_1.useState)('idle');
@@ -44,6 +45,7 @@ const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/
     const attempt = (0, react_1.useRef)(0);
     const inFlight = (0, react_1.useRef)(false);
     const mounted = (0, react_1.useRef)(false);
+    const cancelPending = (0, react_1.useRef)(null);
     (0, react_1.useEffect)(() => {
         mounted.current = true;
         attempt.current += 1;
@@ -52,24 +54,41 @@ const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/
         setErrorMsg(null);
         return () => { mounted.current = false; attempt.current += 1; };
     }, [gatewayBaseUrl]);
+    (0, react_1.useEffect)(() => () => { cancelPending.current?.(); }, []);
     const handleAuth = async () => {
         if (!mounted.current || inFlight.current)
             return;
         inFlight.current = true;
         const request = ++attempt.current;
         const isCurrent = () => request === attempt.current;
+        const controller = typeof AbortController === 'undefined' ? undefined : new AbortController();
+        let interrupt = () => { };
+        const interrupted = new Promise((_, reject) => { interrupt = reject; });
+        const deadline = setTimeout(() => {
+            interrupt(new Error('Authentication timed out. The organization may already have been created. Check the gateway before trying again.'));
+            controller?.abort();
+        }, AUTH_TIMEOUT_MS);
+        const cancel = () => {
+            clearTimeout(deadline);
+            interrupt(new Error('Authentication cancelled'));
+            controller?.abort();
+        };
+        cancelPending.current = cancel;
+        // Some native transports do not settle on abort. Bound requests and body reads.
+        const bounded = (work) => Promise.race([work, interrupted]);
         setIsLoading(true);
         setStatus('idle');
         setErrorMsg(null);
         try {
             // Step 1: Create organization
-            const orgRes = await fetch(`${gatewayBaseUrl}/api/v1.1/organisation`, {
+            const orgRes = await bounded(fetch(`${gatewayBaseUrl}/api/v1.1/organisation`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-            });
+                signal: controller?.signal,
+            }));
             if (!isCurrent())
                 return;
-            const orgData = await orgRes.json();
+            const orgData = await bounded(orgRes.json());
             if (!isCurrent())
                 return;
             if (!orgRes.ok) {
@@ -88,13 +107,14 @@ const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/
                 return;
             }
             // Step 2: Get token
-            const tokenRes = await fetch(`${gatewayBaseUrl}/api/v1.1/organisation/token`, {
+            const tokenRes = await bounded(fetch(`${gatewayBaseUrl}/api/v1.1/organisation/token`, {
                 method: 'GET',
                 headers: { 'X-ORG-API-KEY': apiKey },
-            });
+                signal: controller?.signal,
+            }));
             if (!isCurrent())
                 return;
-            const tokenData = await tokenRes.json();
+            const tokenData = await bounded(tokenRes.json());
             if (!isCurrent())
                 return;
             if (!tokenRes.ok) {
@@ -125,6 +145,9 @@ const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/
             console.error('Auth error:', e);
         }
         finally {
+            clearTimeout(deadline);
+            if (cancelPending.current === cancel)
+                cancelPending.current = null;
             inFlight.current = false;
             if (mounted.current)
                 setIsLoading(false);

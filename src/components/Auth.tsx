@@ -6,6 +6,8 @@ interface AuthProps {
   gatewayUrl?: string;
 }
 
+const AUTH_TIMEOUT_MS = 30_000;
+
 export const Auth: React.FC<AuthProps> = ({
   onTokenReceived,
   gatewayUrl = 'https://gateway.dev.netsepio.com/',
@@ -17,6 +19,7 @@ export const Auth: React.FC<AuthProps> = ({
   const attempt = useRef(0);
   const inFlight = useRef(false);
   const mounted = useRef(false);
+  const cancelPending = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -27,22 +30,40 @@ export const Auth: React.FC<AuthProps> = ({
     return () => { mounted.current = false; attempt.current += 1; };
   }, [gatewayBaseUrl]);
 
+  useEffect(() => () => { cancelPending.current?.(); }, []);
+
   const handleAuth = async () => {
     if (!mounted.current || inFlight.current) return;
     inFlight.current = true;
     const request = ++attempt.current;
     const isCurrent = () => request === attempt.current;
+    const controller = typeof AbortController === 'undefined' ? undefined : new AbortController();
+    let interrupt: (error: Error) => void = () => {};
+    const interrupted = new Promise<never>((_, reject) => { interrupt = reject; });
+    const deadline = setTimeout(() => {
+      interrupt(new Error('Authentication timed out. The organization may already have been created. Check the gateway before trying again.'));
+      controller?.abort();
+    }, AUTH_TIMEOUT_MS);
+    const cancel = () => {
+      clearTimeout(deadline);
+      interrupt(new Error('Authentication cancelled'));
+      controller?.abort();
+    };
+    cancelPending.current = cancel;
+    // Some native transports do not settle on abort. Bound requests and body reads.
+    const bounded = <T,>(work: Promise<T>): Promise<T> => Promise.race([work, interrupted]);
     setIsLoading(true);
     setStatus('idle');
     setErrorMsg(null);
     try {
       // Step 1: Create organization
-      const orgRes = await fetch(`${gatewayBaseUrl}/api/v1.1/organisation`, {
+      const orgRes = await bounded(fetch(`${gatewayBaseUrl}/api/v1.1/organisation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-      });
+        signal: controller?.signal,
+      }));
       if (!isCurrent()) return;
-      const orgData = await orgRes.json();
+      const orgData = await bounded(orgRes.json());
       if (!isCurrent()) return;
       if (!orgRes.ok) {
         const msg = typeof orgData?.message === 'string' && orgData.message.trim()
@@ -61,12 +82,13 @@ export const Auth: React.FC<AuthProps> = ({
       }
 
       // Step 2: Get token
-      const tokenRes = await fetch(`${gatewayBaseUrl}/api/v1.1/organisation/token`, {
+      const tokenRes = await bounded(fetch(`${gatewayBaseUrl}/api/v1.1/organisation/token`, {
         method: 'GET',
         headers: { 'X-ORG-API-KEY': apiKey },
-      });
+        signal: controller?.signal,
+      }));
       if (!isCurrent()) return;
-      const tokenData = await tokenRes.json();
+      const tokenData = await bounded(tokenRes.json());
       if (!isCurrent()) return;
       if (!tokenRes.ok) {
         const msg = typeof tokenData?.message === 'string' && tokenData.message.trim()
@@ -94,6 +116,8 @@ export const Auth: React.FC<AuthProps> = ({
       setStatus('error');
       console.error('Auth error:', e);
     } finally {
+      clearTimeout(deadline);
+      if (cancelPending.current === cancel) cancelPending.current = null;
       inFlight.current = false;
       if (mounted.current) setIsLoading(false);
     }

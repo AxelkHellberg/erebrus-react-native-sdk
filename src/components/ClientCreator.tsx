@@ -259,20 +259,6 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
         const endpoint = payload.endpoint;
         const endpointHost = endpoint.includes(':') &&
           !(endpoint.startsWith('[') && endpoint.endsWith(']')) ? `[${endpoint}]` : endpoint;
-        const configFile = `
-[Interface]
-Address = ${client.Address[0]}
-PrivateKey = ${keys.privKey}
-DNS = 1.1.1.1
-
-[Peer]
-PublicKey = ${data.payload.serverPublicKey}
-PresharedKey = ${client.PresharedKey}
-AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = ${endpointHost}:51820
-PersistentKeepalive = 16`;
-        setConfigFile(configFile);
-        setShowQrCode(true);
         const vpnConfig = {
           privateKey: keys.privKey,
           publicKey: data.payload.serverPublicKey,
@@ -285,6 +271,21 @@ PersistentKeepalive = 16`;
           presharedKey: client.PresharedKey,
           persistentKeepalive: 16,
         };
+        const configFile = `
+[Interface]
+Address = ${vpnConfig.address}
+PrivateKey = ${vpnConfig.privateKey}
+DNS = ${vpnConfig.dns.join(', ')}
+MTU = ${vpnConfig.mtu}
+
+[Peer]
+PublicKey = ${vpnConfig.publicKey}
+PresharedKey = ${vpnConfig.presharedKey}
+AllowedIPs = ${vpnConfig.allowedIPs.join(', ')}
+Endpoint = ${endpointHost}:${vpnConfig.serverPort}
+PersistentKeepalive = ${vpnConfig.persistentKeepalive}`;
+        setConfigFile(configFile);
+        setShowQrCode(true);
         onClientCreated({ configFile, vpnConfig });
       } else {
         const errorText = await response.text();

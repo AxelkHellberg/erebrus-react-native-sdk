@@ -198,6 +198,15 @@ describe('ClientCreator creation ownership', () => {
     expect(renderer.root.findAllByType('QRCode')).toHaveLength(1);
   });
 
+  test.each(['DNS', 'MTU'])('exports the native %s setting in the configuration and QR code', async setting => {
+    global.fetch.mockResolvedValueOnce(result());
+    await act(async () => { await button().props.onPress(); });
+    const { configFile, vpnConfig } = onClientCreated.mock.calls[0][0];
+    const expected = setting === 'DNS' ? vpnConfig.dns.join(', ') : String(vpnConfig.mtu);
+    expect(configFile.split('\n').find(line => line.startsWith(`${setting} = `))).toBe(`${setting} = ${expected}`);
+    expect(renderer.root.findByType('QRCode').props.value).toBe(configFile);
+  });
+
   test.each([
     ['2001:db8::1', '[2001:db8::1]'],
     ['[2001:db8::1]', '[2001:db8::1]'],
@@ -213,6 +222,18 @@ describe('ClientCreator creation ownership', () => {
     expect(delivered.configFile.split('\n').find(line => line.startsWith('Endpoint = '))).toBe(`Endpoint = ${expectedHost}:51820`);
     expect(delivered.vpnConfig.serverAddress).toBe(endpoint);
     expect(delivered.vpnConfig.serverPort).toBe(51820);
+    const exported = Object.fromEntries(delivered.configFile.split('\n').filter(line => line.includes(' = ')).map(line => line.split(' = ')));
+    expect(exported).toEqual({
+      Address: delivered.vpnConfig.address,
+      PrivateKey: delivered.vpnConfig.privateKey,
+      DNS: delivered.vpnConfig.dns.join(', '),
+      MTU: String(delivered.vpnConfig.mtu),
+      PublicKey: delivered.vpnConfig.publicKey,
+      PresharedKey: delivered.vpnConfig.presharedKey,
+      AllowedIPs: delivered.vpnConfig.allowedIPs.join(', '),
+      Endpoint: `${expectedHost}:${delivered.vpnConfig.serverPort}`,
+      PersistentKeepalive: String(delivered.vpnConfig.persistentKeepalive),
+    });
     expect(renderer.root.findByType('QRCode').props.value).toBe(delivered.configFile);
   });
 

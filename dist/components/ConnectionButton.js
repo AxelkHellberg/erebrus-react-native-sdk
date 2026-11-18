@@ -42,6 +42,7 @@ const ConnectionButton = ({ isConnected, isConnecting, isDisconnecting, onConnec
     textSecondary: '#6b7280',
 }, }) => {
     const scaleAnim = (0, react_1.useRef)(new react_native_1.Animated.Value(1)).current;
+    const isBusy = isConnecting || isDisconnecting;
     const handlePress = () => {
         react_native_1.Animated.sequence([
             react_native_1.Animated.timing(scaleAnim, {
@@ -71,8 +72,8 @@ const ConnectionButton = ({ isConnected, isConnecting, isDisconnecting, onConnec
                 borderWidth: 4,
                 borderColor: isConnected ? theme.error : theme.success,
             },
-        ]} onPress={handlePress} disabled={isConnecting || isDisconnecting}>
-          {(isConnecting || isDisconnecting) ? (<react_native_1.ActivityIndicator color="#ffffff" size="large"/>) : (<>
+        ]} onPress={handlePress} disabled={isBusy} accessibilityRole="button" accessibilityLabel={isConnected ? 'Disconnect' : 'Connect'} accessibilityState={{ disabled: isBusy, busy: isBusy }}>
+          {isBusy ? (<react_native_1.ActivityIndicator color="#ffffff" size="large"/>) : (<>
               <react_native_1.Text style={styles.buttonText}>
                 {isConnected ? "Disconnect" : "Connect"}
               </react_native_1.Text>

@@ -244,6 +244,9 @@ PersistentKeepalive = 16`;
     }
   }, [apiConfig, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
 
+  const nodeSelectionDisabled = !selectedRegion || !nodesData.some((node) => node.region === selectedRegion);
+  const createDisabled = !newClientName || !selectedRegion || !selectedNodeId || isCreatingClient;
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
       {!token ? (
@@ -255,6 +258,7 @@ PersistentKeepalive = 16`;
             <View style={styles.form}>
               <Text style={[styles.label, { color: theme.text }]}>Client Name</Text>
               <TextInput
+                accessibilityLabel="Client Name"
                 style={[
                   styles.input,
                   {
@@ -275,6 +279,8 @@ PersistentKeepalive = 16`;
                 {REGIONS.map((region) => (
                   <TouchableOpacity
                     key={region.id}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: selectedRegion === region.id }}
                     style={[
                       styles.regionButton,
                       {
@@ -297,12 +303,22 @@ PersistentKeepalive = 16`;
 
               <Text style={[styles.label, { color: theme.text }]}>Node</Text>
               {isLoadingNodes ? (
-                <ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 10 }} />
+                <ActivityIndicator
+                  accessibilityRole="progressbar"
+                  accessibilityLabel="Loading nodes"
+                  size="small"
+                  color={theme.primary}
+                  style={{ marginVertical: 10 }}
+                />
               ) : nodesError ? (
-                <Text style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</Text>
+                <Text accessibilityRole="alert" style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</Text>
               ) : (
                 <>
                   <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="Select Node"
+                    accessibilityValue={{ text: selectedNodeName || 'No node selected' }}
+                    accessibilityState={{ disabled: nodeSelectionDisabled, expanded: showNodeModal }}
                     style={[
                       styles.nodeSelectButton,
                       {
@@ -311,7 +327,7 @@ PersistentKeepalive = 16`;
                       },
                     ]}
                     onPress={() => setShowNodeModal(true)}
-                    disabled={!selectedRegion || nodesData.filter((n) => n.region === selectedRegion).length === 0}
+                    disabled={nodeSelectionDisabled}
                   >
                     <Text style={{ color: theme.text }}>
                       {selectedNodeName || 'Select Node'}
@@ -331,6 +347,8 @@ PersistentKeepalive = 16`;
                           keyExtractor={(item) => item.id}
                           renderItem={({ item }) => (
                             <TouchableOpacity
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: selectedNodeId === item.id }}
                               style={[
                                 styles.nodeItem,
                                 {
@@ -353,6 +371,8 @@ PersistentKeepalive = 16`;
                           style={{ maxHeight: 300 }}
                         />
                         <TouchableOpacity
+                          accessibilityRole="button"
+                          accessibilityLabel="Close node selection"
                           style={[styles.closeButton, { backgroundColor: theme.primary, marginTop: 20 }]}
                           onPress={() => setShowNodeModal(false)}
                         >
@@ -365,15 +385,18 @@ PersistentKeepalive = 16`;
               )}
 
               <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Create Client"
+                accessibilityState={{ disabled: createDisabled, busy: isCreatingClient }}
                 style={[
                   styles.createButton,
                   {
                     backgroundColor: theme.primary,
-                    opacity: !newClientName || !selectedRegion || !selectedNodeId || isCreatingClient ? 0.5 : 1,
+                    opacity: createDisabled ? 0.5 : 1,
                   },
                 ]}
                 onPress={createVPNClient}
-                disabled={!newClientName || !selectedRegion || !selectedNodeId || isCreatingClient}
+                disabled={createDisabled}
               >
                 {isCreatingClient ? (
                   <ActivityIndicator color="#ffffff" size="small" />
@@ -497,4 +520,4 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-}); 
+});

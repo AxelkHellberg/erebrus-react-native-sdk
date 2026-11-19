@@ -184,7 +184,7 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
         presharedKey: keys.preSharedKey,
         publicKey: keys.pubKey,
       };
-      const url = `${apiConfig.gatewayUrl}api/v1.0/erebrus/client/${selectedNodeId}`;
+      const url = `${apiConfig.gatewayUrl}api/v1.0/erebrus/client/${encodeURIComponent(selectedNodeId)}`;
       console.log('Token used for client creation:', token);
       console.log('POST URL:', url);
       console.log('Request body:', requestData);

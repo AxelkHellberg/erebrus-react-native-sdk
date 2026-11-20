@@ -44,13 +44,22 @@ const Auth = ({ onTokenReceived }) => {
         setIsLoading(true);
         setStatus('idle');
         setErrorMsg(null);
+        const controller = typeof AbortController === 'function' ? new AbortController() : undefined;
+        let timeout;
+        const deadline = new Promise((_, reject) => {
+            timeout = setTimeout(() => {
+                reject(new Error('Authentication timed out. Organization creation may have completed; check the gateway before trying again.'));
+                controller?.abort();
+            }, 30000);
+        });
         try {
             // Step 1: Create organization
-            const orgRes = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            });
-            const orgData = await orgRes.json();
+            const orgRes = await Promise.race([fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: controller?.signal,
+                }), deadline]);
+            const orgData = await Promise.race([orgRes.json(), deadline]);
             if (!orgRes.ok) {
                 const msg = orgData?.message || 'Failed to create organization';
                 setErrorMsg(msg);
@@ -66,11 +75,12 @@ const Auth = ({ onTokenReceived }) => {
                 return;
             }
             // Step 2: Get token
-            const tokenRes = await fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation/token', {
-                method: 'GET',
-                headers: { 'X-ORG-API-KEY': apiKey },
-            });
-            const tokenData = await tokenRes.json();
+            const tokenRes = await Promise.race([fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation/token', {
+                    method: 'GET',
+                    headers: { 'X-ORG-API-KEY': apiKey },
+                    signal: controller?.signal,
+                }), deadline]);
+            const tokenData = await Promise.race([tokenRes.json(), deadline]);
             if (!tokenRes.ok) {
                 const msg = tokenData?.message || 'Failed to generate token';
                 setErrorMsg(msg);
@@ -94,6 +104,7 @@ const Auth = ({ onTokenReceived }) => {
             console.error('Auth error:', e);
         }
         finally {
+            clearTimeout(timeout);
             setIsLoading(false);
         }
     };

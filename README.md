@@ -59,6 +59,12 @@ The Auth component:
 - Exchanges the returned API key for a token
 - Calls `onTokenReceived` with the generated token
 
+Each authentication attempt has a 30-second total deadline, including both requests
+and response-body reads. A timeout stops waiting, reports an error, and aborts the
+requests when the platform supports `AbortController`. Late responses cannot deliver
+a token, and the SDK does not retry automatically. Organization creation may have
+completed on the gateway despite a timeout; check the gateway before trying again.
+
 ### Using the Connection Button
 
 ```tsx

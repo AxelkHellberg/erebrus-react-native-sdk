@@ -48,6 +48,11 @@ const axios_1 = __importDefault(require("axios"));
 const curve25519_js_1 = require("curve25519-js");
 const react_native_qrcode_svg_1 = __importDefault(require("react-native-qrcode-svg"));
 const Auth_1 = require("./Auth");
+const clientCreationErrorMessage = (error) => {
+    const message = typeof error === 'string' ? error :
+        error !== null && typeof error === 'object' && 'message' in error ? error.message : undefined;
+    return typeof message === 'string' && message.trim() ? message : 'Unknown error occurred';
+};
 const REGIONS = [
     { id: "SG", name: "Singapore" },
     { id: "IN", name: "India" },
@@ -189,7 +194,15 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
         const isCurrent = () => mounted.current && generation === creationGeneration.current;
         creationInFlight.current = true;
         setIsCreatingClient(true);
+        let timeout;
         try {
+            const controller = typeof AbortController === 'function' ? new AbortController() : undefined;
+            const deadline = new Promise((_, reject) => {
+                timeout = setTimeout(() => {
+                    reject(new Error('Client creation timed out. The gateway may have created the client; check the gateway before trying again.'));
+                    controller?.abort();
+                }, 30000);
+            });
             const keys = generateKeys();
             const requestData = {
                 name: newClientName,
@@ -200,19 +213,20 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
             console.log('Token used for client creation:', token);
             console.log('POST URL:', url);
             console.log('Request body:', requestData);
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json, text/plain, */*',
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify(requestData),
-            });
+            const response = await Promise.race([fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json, text/plain, */*',
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify(requestData),
+                    signal: controller?.signal,
+                }), deadline]);
             if (!isCurrent())
                 return;
             if (response.status === 200) {
-                const data = await response.json();
+                const data = await Promise.race([response.json(), deadline]);
                 if (!isCurrent())
                     return;
                 const payload = data?.payload;
@@ -227,20 +241,6 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
                 const endpoint = payload.endpoint;
                 const endpointHost = endpoint.includes(':') &&
                     !(endpoint.startsWith('[') && endpoint.endsWith(']')) ? `[${endpoint}]` : endpoint;
-                const configFile = `
-[Interface]
-Address = ${client.Address[0]}
-PrivateKey = ${keys.privKey}
-DNS = 1.1.1.1
-
-[Peer]
-PublicKey = ${data.payload.serverPublicKey}
-PresharedKey = ${client.PresharedKey}
-AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = ${endpointHost}:51820
-PersistentKeepalive = 16`;
-                setConfigFile(configFile);
-                setShowQrCode(true);
                 const vpnConfig = {
                     privateKey: keys.privKey,
                     publicKey: data.payload.serverPublicKey,
@@ -253,10 +253,25 @@ PersistentKeepalive = 16`;
                     presharedKey: client.PresharedKey,
                     persistentKeepalive: 16,
                 };
+                const configFile = `
+[Interface]
+Address = ${vpnConfig.address}
+PrivateKey = ${vpnConfig.privateKey}
+DNS = ${vpnConfig.dns.join(', ')}
+MTU = ${vpnConfig.mtu}
+
+[Peer]
+PublicKey = ${vpnConfig.publicKey}
+PresharedKey = ${vpnConfig.presharedKey}
+AllowedIPs = ${vpnConfig.allowedIPs.join(', ')}
+Endpoint = ${endpointHost}:${vpnConfig.serverPort}
+PersistentKeepalive = ${vpnConfig.persistentKeepalive}`;
+                setConfigFile(configFile);
+                setShowQrCode(true);
                 onClientCreated({ configFile, vpnConfig });
             }
             else {
-                const errorText = await response.text();
+                const errorText = await Promise.race([response.text(), deadline]);
                 if (!isCurrent())
                     return;
                 console.error('Failed to create VPN client:', errorText);
@@ -267,11 +282,10 @@ PersistentKeepalive = 16`;
             if (!isCurrent())
                 return;
             console.error('Failed to create VPN client:', error);
-            let errorMessage = 'Failed to create VPN client: ';
-            errorMessage += error.message || 'Unknown error occurred';
-            react_native_1.Alert.alert('Error', errorMessage);
+            react_native_1.Alert.alert('Error', `Failed to create VPN client: ${clientCreationErrorMessage(error)}`);
         }
         finally {
+            clearTimeout(timeout);
             creationInFlight.current = false;
             if (mounted.current)
                 setIsCreatingClient(false);

@@ -198,6 +198,15 @@ describe('ClientCreator creation ownership', () => {
     expect(renderer.root.findAllByType('QRCode')).toHaveLength(1);
   });
 
+  test.each(['DNS', 'MTU'])('exports the native %s setting in the configuration and QR code', async setting => {
+    global.fetch.mockResolvedValueOnce(result());
+    await act(async () => { await button().props.onPress(); });
+    const { configFile, vpnConfig } = onClientCreated.mock.calls[0][0];
+    const expected = setting === 'DNS' ? vpnConfig.dns.join(', ') : String(vpnConfig.mtu);
+    expect(configFile.split('\n').find(line => line.startsWith(`${setting} = `))).toBe(`${setting} = ${expected}`);
+    expect(renderer.root.findByType('QRCode').props.value).toBe(configFile);
+  });
+
   test.each([
     ['2001:db8::1', '[2001:db8::1]'],
     ['[2001:db8::1]', '[2001:db8::1]'],
@@ -213,7 +222,152 @@ describe('ClientCreator creation ownership', () => {
     expect(delivered.configFile.split('\n').find(line => line.startsWith('Endpoint = '))).toBe(`Endpoint = ${expectedHost}:51820`);
     expect(delivered.vpnConfig.serverAddress).toBe(endpoint);
     expect(delivered.vpnConfig.serverPort).toBe(51820);
+    const exported = Object.fromEntries(delivered.configFile.split('\n').filter(line => line.includes(' = ')).map(line => line.split(' = ')));
+    expect(exported).toEqual({
+      Address: delivered.vpnConfig.address,
+      PrivateKey: delivered.vpnConfig.privateKey,
+      DNS: delivered.vpnConfig.dns.join(', '),
+      MTU: String(delivered.vpnConfig.mtu),
+      PublicKey: delivered.vpnConfig.publicKey,
+      PresharedKey: delivered.vpnConfig.presharedKey,
+      AllowedIPs: delivered.vpnConfig.allowedIPs.join(', '),
+      Endpoint: `${expectedHost}:${delivered.vpnConfig.serverPort}`,
+      PersistentKeepalive: String(delivered.vpnConfig.persistentKeepalive),
+    });
     expect(renderer.root.findByType('QRCode').props.value).toBe(delivered.configFile);
+  });
+
+  describe.each(['network', 'body'])('%s failure reporting', phase => {
+    test.each([
+      ['null', null, 'Unknown error occurred'],
+      ['undefined', undefined, 'Unknown error occurred'],
+      ['plain text', 'offline', 'offline'],
+      ['Error', new Error('connection lost'), 'connection lost'],
+      ['text message', { message: 'request failed' }, 'request failed'],
+      ['structured message', { message: { detail: 'unavailable' } }, 'Unknown error occurred'],
+      ['numeric rejection', 503, 'Unknown error occurred'],
+      ['blank message', { message: '  ' }, 'Unknown error occurred'],
+      ['blank text', '', 'Unknown error occurred'],
+    ])('handles %s and permits a later manual attempt', async (_name, failure, expectedMessage) => {
+      if (phase === 'network') global.fetch.mockRejectedValueOnce(failure);
+      else global.fetch.mockResolvedValueOnce({ status: 200, json: async () => { throw failure; } });
+
+      await act(async () => { await expect(button().props.onPress()).resolves.toBeUndefined(); });
+      expect(Alert.alert).toHaveBeenCalledWith('Error', `Failed to create VPN client: ${expectedMessage}`);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(onClientCreated).not.toHaveBeenCalled();
+      expect(renderer.root.findAllByType('QRCode')).toHaveLength(0);
+      expect(button().props.disabled).toBe(false);
+
+      // The server may have accepted the first request; retry only on a new user action.
+      global.fetch.mockResolvedValueOnce(result());
+      await act(async () => { await button().props.onPress(); });
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(onClientCreated).toHaveBeenCalledTimes(1);
+      expect(Alert.alert).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('client creation deadline', () => {
+    let originalAbortController;
+    beforeEach(() => { jest.useFakeTimers(); originalAbortController = global.AbortController; });
+    afterEach(() => {
+      global.AbortController = originalAbortController;
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    });
+    const advance = async milliseconds => {
+      await act(async () => { jest.advanceTimersByTime(milliseconds); await Promise.resolve(); });
+    };
+
+    test.each(['headers', 'json', 'text'])('bounds stalled %s and discards its late result', async phase => {
+      const pending = deferred();
+      if (phase === 'headers') global.fetch.mockReturnValueOnce(pending.promise);
+      else global.fetch.mockResolvedValueOnce(phase === 'json'
+        ? { status: 200, json: () => pending.promise }
+        : { status: 503, text: () => pending.promise });
+      let request, settled = false;
+      await act(async () => { request = button().props.onPress(); request.then(() => { settled = true; }); });
+      await advance(29999);
+      expect(settled).toBe(false);
+      await advance(1);
+      expect(settled).toBe(true);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(Alert.alert).toHaveBeenCalledWith('Error', expect.stringMatching(/timed out.*may have.*check the gateway/i));
+      expect(onClientCreated).not.toHaveBeenCalled();
+      expect(button().props.disabled).toBe(false);
+      expect(global.fetch.mock.calls[0][1].signal.aborted).toBe(true);
+      await act(async () => {
+        pending.resolve(phase === 'headers' ? result() : phase === 'json' ? await result().json() : 'late failure');
+        await request;
+      });
+      expect(onClientCreated).not.toHaveBeenCalled();
+      expect(Alert.alert).toHaveBeenCalledTimes(1);
+      expect(renderer.root.findAllByType('QRCode')).toHaveLength(0);
+      // No automatic retry; a fresh user action can start one after inspection.
+      global.fetch.mockResolvedValueOnce(result());
+      await act(async () => { await button().props.onPress(); });
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(onClientCreated).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    test('uses one total deadline across headers and response-body reads', async () => {
+      const headers = deferred(), body = deferred();
+      global.fetch.mockReturnValueOnce(headers.promise);
+      let request, settled = false;
+      await act(async () => { request = button().props.onPress(); request.then(() => { settled = true; }); });
+      await advance(20000);
+      await act(async () => { headers.resolve({ status: 200, json: () => body.promise }); });
+      await advance(9999);
+      expect(settled).toBe(false);
+      await advance(1);
+      expect(settled).toBe(true);
+      expect(Alert.alert).toHaveBeenCalledTimes(1);
+      await act(async () => { body.resolve(await result().json()); await request; });
+      expect(onClientCreated).not.toHaveBeenCalled();
+    });
+
+    test.each(['success', 'network', 'http', 'body'])('cleans up the timer after %s settlement', async outcome => {
+      if (outcome === 'success') global.fetch.mockResolvedValueOnce(result());
+      if (outcome === 'network') global.fetch.mockRejectedValueOnce(new Error('offline'));
+      if (outcome === 'http') global.fetch.mockResolvedValueOnce({ status: 503, text: async () => 'unavailable' });
+      if (outcome === 'body') global.fetch.mockResolvedValueOnce({ status: 200, json: async () => { throw new Error('bad body'); } });
+      await act(async () => { await button().props.onPress(); });
+      expect(jest.getTimerCount()).toBe(0);
+      const alerts = Alert.alert.mock.calls.length;
+      await advance(30000);
+      expect(Alert.alert).toHaveBeenCalledTimes(alerts);
+      expect(global.fetch.mock.calls[0][1].signal.aborted).toBe(false);
+    });
+
+    test('bounds waits without AbortController and consumes late rejection', async () => {
+      global.AbortController = undefined;
+      const pending = deferred(); global.fetch.mockReturnValueOnce(pending.promise);
+      let request, settled = false;
+      await act(async () => { request = button().props.onPress(); request.then(() => { settled = true; }); });
+      await advance(30000);
+      expect(settled).toBe(true);
+      expect(global.fetch.mock.calls[0][1].signal).toBeUndefined();
+      expect(Alert.alert).toHaveBeenCalledTimes(1);
+      await act(async () => { pending.reject(new Error('late network failure')); await request; });
+      expect(Alert.alert).toHaveBeenCalledTimes(1);
+      expect(onClientCreated).not.toHaveBeenCalled();
+    });
+
+    test.each(['account change', 'unmount'])('suppresses timeout UI after %s', async change => {
+      global.fetch.mockReturnValueOnce(deferred().promise);
+      let request, settled = false;
+      await act(async () => { request = button().props.onPress(); request.then(() => { settled = true; }); });
+      if (change === 'account change') await changeAccount();
+      else { act(() => renderer.unmount()); renderer = null; }
+      await advance(30000);
+      expect(settled).toBe(true);
+      expect(Alert.alert).not.toHaveBeenCalled();
+      expect(onClientCreated).not.toHaveBeenCalled();
+      await request;
+      expect(jest.getTimerCount()).toBe(0);
+    });
   });
 
 });

@@ -220,7 +220,15 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
     const isCurrent = () => mounted.current && generation === creationGeneration.current;
     creationInFlight.current = true;
     setIsCreatingClient(true);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
+      const controller = typeof AbortController === 'function' ? new AbortController() : undefined;
+      const deadline = new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          reject(new Error('Client creation timed out. The gateway may have created the client; check the gateway before trying again.'));
+          controller?.abort();
+        }, 30000);
+      });
       const keys = generateKeys();
       const requestData = {
         name: newClientName,
@@ -232,7 +240,7 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
       console.log('POST URL:', url);
       console.log('Request body:', requestData);
 
-      const response = await fetch(url, {
+      const response = await Promise.race([fetch(url, {
         method: 'POST',
         headers: {
           Accept: 'application/json, text/plain, */*',
@@ -240,11 +248,12 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(requestData),
-      });
+        signal: controller?.signal,
+      }), deadline]);
 
       if (!isCurrent()) return;
       if (response.status === 200) {
-        const data = await response.json();
+        const data = await Promise.race([response.json(), deadline]);
         if (!isCurrent()) return;
         const payload = data?.payload;
         const client = payload?.client;
@@ -288,7 +297,7 @@ PersistentKeepalive = ${vpnConfig.persistentKeepalive}`;
         setShowQrCode(true);
         onClientCreated({ configFile, vpnConfig });
       } else {
-        const errorText = await response.text();
+        const errorText = await Promise.race([response.text(), deadline]);
         if (!isCurrent()) return;
         console.error('Failed to create VPN client:', errorText);
         Alert.alert('Error', `Failed to create VPN client: ${errorText}`);
@@ -298,6 +307,7 @@ PersistentKeepalive = ${vpnConfig.persistentKeepalive}`;
       console.error('Failed to create VPN client:', error);
       Alert.alert('Error', `Failed to create VPN client: ${clientCreationErrorMessage(error)}`);
     } finally {
+      clearTimeout(timeout);
       creationInFlight.current = false;
       if (mounted.current) setIsCreatingClient(false);
     }

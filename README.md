@@ -322,7 +322,12 @@ A component for creating new VPN clients.
 `ClientCreator` follows updates to `apiConfig.token` and `apiConfig.gatewayUrl`.
 Changing either clears the previous node selection. Equivalent config objects do
 not start another node request, and obsolete responses are ignored after a config
-change or unmount. Already-started HTTP requests are not cancelled.
+change or unmount. Changing configuration or unmounting does not cancel an
+already-started request. Client creation has one 30-second deadline across the
+POST and response-body read. On timeout the SDK attempts cancellation when
+`AbortController` is available, releases loading state, and ignores late results.
+The gateway may already have created the client; check it before manually
+trying again. The SDK does not retry automatically.
 
 ### StatusCard
 

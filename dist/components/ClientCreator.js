@@ -194,7 +194,15 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
         const isCurrent = () => mounted.current && generation === creationGeneration.current;
         creationInFlight.current = true;
         setIsCreatingClient(true);
+        let timeout;
         try {
+            const controller = typeof AbortController === 'function' ? new AbortController() : undefined;
+            const deadline = new Promise((_, reject) => {
+                timeout = setTimeout(() => {
+                    reject(new Error('Client creation timed out. The gateway may have created the client; check the gateway before trying again.'));
+                    controller?.abort();
+                }, 30000);
+            });
             const keys = generateKeys();
             const requestData = {
                 name: newClientName,
@@ -205,19 +213,20 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
             console.log('Token used for client creation:', token);
             console.log('POST URL:', url);
             console.log('Request body:', requestData);
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json, text/plain, */*',
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify(requestData),
-            });
+            const response = await Promise.race([fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json, text/plain, */*',
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify(requestData),
+                    signal: controller?.signal,
+                }), deadline]);
             if (!isCurrent())
                 return;
             if (response.status === 200) {
-                const data = await response.json();
+                const data = await Promise.race([response.json(), deadline]);
                 if (!isCurrent())
                     return;
                 const payload = data?.payload;
@@ -262,7 +271,7 @@ PersistentKeepalive = ${vpnConfig.persistentKeepalive}`;
                 onClientCreated({ configFile, vpnConfig });
             }
             else {
-                const errorText = await response.text();
+                const errorText = await Promise.race([response.text(), deadline]);
                 if (!isCurrent())
                     return;
                 console.error('Failed to create VPN client:', errorText);
@@ -276,6 +285,7 @@ PersistentKeepalive = ${vpnConfig.persistentKeepalive}`;
             react_native_1.Alert.alert('Error', `Failed to create VPN client: ${clientCreationErrorMessage(error)}`);
         }
         finally {
+            clearTimeout(timeout);
             creationInFlight.current = false;
             if (mounted.current)
                 setIsCreatingClient(false);

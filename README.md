@@ -119,6 +119,8 @@ const CreateClient = () => {
 
 ### Displaying VPN Status
 
+`StatusCard` displays an unknown connection state until a VPN status is available.
+
 ```tsx
 import { StatusCard, useVPN } from 'erebrus-react-native-sdk';
 

@@ -43,8 +43,12 @@ export const StatusCard: React.FC<StatusCardProps> = ({
   },
 }) => {
   const isConnected = vpnStatus?.isConnected;
-  const statusColor = isConnected ? theme.success : theme.error;
-  const statusText = isConnected ? 'Connected' : 'Disconnected';
+  const statusColor = vpnStatus
+    ? (isConnected ? theme.success : theme.error)
+    : theme.textSecondary;
+  const statusText = vpnStatus
+    ? (isConnected ? 'Connected' : 'Disconnected')
+    : 'Unknown';
 
   return (
     <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -116,4 +120,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: 'monospace',
   },
-}); 
+});

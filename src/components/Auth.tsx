@@ -74,6 +74,9 @@ export const Auth: React.FC<AuthProps> = ({ onTokenReceived }) => {
         style={styles.button}
         onPress={handleAuth}
         disabled={isLoading}
+        accessibilityRole="button"
+        accessibilityLabel="Create Organization & Get Token"
+        accessibilityState={{ disabled: isLoading, busy: isLoading }}
       >
         {isLoading ? (
           <ActivityIndicator color="#fff" />
@@ -81,9 +84,13 @@ export const Auth: React.FC<AuthProps> = ({ onTokenReceived }) => {
           <Text style={styles.buttonText}>Create Organization & Get Token</Text>
         )}
       </TouchableOpacity>
-      {status === 'success' && <Text style={styles.success}>Token generated!</Text>}
+      {status === 'success' && (
+        <Text style={styles.success} accessibilityLiveRegion="polite">Token generated!</Text>
+      )}
       {status === 'error' && (
-        <Text style={styles.error}>{errorMsg || 'Something went wrong. Try again.'}</Text>
+        <Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="assertive">
+          {errorMsg || 'Something went wrong. Try again.'}
+        </Text>
       )}
     </View>
   );
@@ -118,4 +125,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 8,
   },
-}); 
+});

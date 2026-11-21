@@ -98,11 +98,13 @@ const Auth = ({ onTokenReceived }) => {
         }
     };
     return (<react_native_1.View style={styles.container}>
-      <react_native_1.TouchableOpacity style={styles.button} onPress={handleAuth} disabled={isLoading}>
+      <react_native_1.TouchableOpacity style={styles.button} onPress={handleAuth} disabled={isLoading} accessibilityRole="button" accessibilityLabel="Create Organization & Get Token" accessibilityState={{ disabled: isLoading, busy: isLoading }}>
         {isLoading ? (<react_native_1.ActivityIndicator color="#fff"/>) : (<react_native_1.Text style={styles.buttonText}>Create Organization & Get Token</react_native_1.Text>)}
       </react_native_1.TouchableOpacity>
-      {status === 'success' && <react_native_1.Text style={styles.success}>Token generated!</react_native_1.Text>}
-      {status === 'error' && (<react_native_1.Text style={styles.error}>{errorMsg || 'Something went wrong. Try again.'}</react_native_1.Text>)}
+      {status === 'success' && (<react_native_1.Text style={styles.success} accessibilityLiveRegion="polite">Token generated!</react_native_1.Text>)}
+      {status === 'error' && (<react_native_1.Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="assertive">
+          {errorMsg || 'Something went wrong. Try again.'}
+        </react_native_1.Text>)}
     </react_native_1.View>);
 };
 exports.Auth = Auth;

@@ -34,6 +34,7 @@ export const ConnectionButton: React.FC<ConnectionButtonProps> = ({
   },
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const isBusy = isConnecting || isDisconnecting;
 
   const handlePress = () => {
     Animated.sequence([
@@ -69,9 +70,12 @@ export const ConnectionButton: React.FC<ConnectionButtonProps> = ({
             },
           ]}
           onPress={handlePress}
-          disabled={isConnecting || isDisconnecting}
+          disabled={isBusy}
+          accessibilityRole="button"
+          accessibilityLabel={isConnected ? 'Disconnect' : 'Connect'}
+          accessibilityState={{ disabled: isBusy, busy: isBusy }}
         >
-          {(isConnecting || isDisconnecting) ? (
+          {isBusy ? (
             <ActivityIndicator color="#ffffff" size="large" />
           ) : (
             <>
@@ -128,4 +132,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
-}); 
+});

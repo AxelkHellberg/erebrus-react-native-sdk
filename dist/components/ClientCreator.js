@@ -215,13 +215,15 @@ PersistentKeepalive = 16`;
             setIsCreatingClient(false);
         }
     }, [apiConfig, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
+    const nodeSelectionDisabled = !selectedRegion || !nodesData.some((node) => node.region === selectedRegion);
+    const createDisabled = !newClientName || !selectedRegion || !selectedNodeId || isCreatingClient;
     return (<react_native_1.ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
       {!token ? (<Auth_1.Auth onTokenReceived={handleTokenReceived}/>) : (<>
           <react_native_1.View style={[styles.section, { backgroundColor: theme.surface }]}>
             <react_native_1.Text style={[styles.sectionTitle, { color: theme.text }]}>Create New Client</react_native_1.Text>
             <react_native_1.View style={styles.form}>
               <react_native_1.Text style={[styles.label, { color: theme.text }]}>Client Name</react_native_1.Text>
-              <react_native_1.TextInput style={[
+              <react_native_1.TextInput accessibilityLabel="Client Name" style={[
                 styles.input,
                 {
                     backgroundColor: theme.background,
@@ -232,7 +234,7 @@ PersistentKeepalive = 16`;
 
               <react_native_1.Text style={[styles.label, { color: theme.text }]}>Region</react_native_1.Text>
               <react_native_1.ScrollView horizontal style={{ marginBottom: 16 }} showsHorizontalScrollIndicator={false}>
-                {REGIONS.map((region) => (<react_native_1.TouchableOpacity key={region.id} style={[
+                {REGIONS.map((region) => (<react_native_1.TouchableOpacity key={region.id} accessibilityRole="button" accessibilityState={{ selected: selectedRegion === region.id }} style={[
                     styles.regionButton,
                     {
                         backgroundColor: selectedRegion === region.id ? theme.primary : theme.background,
@@ -250,14 +252,14 @@ PersistentKeepalive = 16`;
               </react_native_1.ScrollView>
 
               <react_native_1.Text style={[styles.label, { color: theme.text }]}>Node</react_native_1.Text>
-              {isLoadingNodes ? (<react_native_1.ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 10 }}/>) : nodesError ? (<react_native_1.Text style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</react_native_1.Text>) : (<>
-                  <react_native_1.TouchableOpacity style={[
+              {isLoadingNodes ? (<react_native_1.ActivityIndicator accessibilityRole="progressbar" accessibilityLabel="Loading nodes" size="small" color={theme.primary} style={{ marginVertical: 10 }}/>) : nodesError ? (<react_native_1.Text accessibilityRole="alert" style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</react_native_1.Text>) : (<>
+                  <react_native_1.TouchableOpacity accessibilityRole="button" accessibilityLabel="Select Node" accessibilityValue={{ text: selectedNodeName || 'No node selected' }} accessibilityState={{ disabled: nodeSelectionDisabled, expanded: showNodeModal }} style={[
                     styles.nodeSelectButton,
                     {
                         backgroundColor: theme.background,
                         borderColor: theme.border,
                     },
-                ]} onPress={() => setShowNodeModal(true)} disabled={!selectedRegion || nodesData.filter((n) => n.region === selectedRegion).length === 0}>
+                ]} onPress={() => setShowNodeModal(true)} disabled={nodeSelectionDisabled}>
                     <react_native_1.Text style={{ color: theme.text }}>
                       {selectedNodeName || 'Select Node'}
                     </react_native_1.Text>
@@ -266,7 +268,7 @@ PersistentKeepalive = 16`;
                     <react_native_1.View style={styles.modalOverlay}>
                       <react_native_1.View style={[styles.modalContent, { backgroundColor: theme.surface }]}> 
                         <react_native_1.Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 10 }]}>Select Node</react_native_1.Text>
-                        <react_native_1.FlatList data={nodesData.filter((node) => node.region === selectedRegion)} keyExtractor={(item) => item.id} renderItem={({ item }) => (<react_native_1.TouchableOpacity style={[
+                        <react_native_1.FlatList data={nodesData.filter((node) => node.region === selectedRegion)} keyExtractor={(item) => item.id} renderItem={({ item }) => (<react_native_1.TouchableOpacity accessibilityRole="button" accessibilityState={{ selected: selectedNodeId === item.id }} style={[
                         styles.nodeItem,
                         {
                             backgroundColor: selectedNodeId === item.id ? theme.primary : theme.background,
@@ -281,7 +283,7 @@ PersistentKeepalive = 16`;
                                 {item.name || item.id.slice(0, 8)} ({item.chainName})
                               </react_native_1.Text>
                             </react_native_1.TouchableOpacity>)} ListEmptyComponent={<react_native_1.Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 20 }}>No nodes available for this region.</react_native_1.Text>} style={{ maxHeight: 300 }}/>
-                        <react_native_1.TouchableOpacity style={[styles.closeButton, { backgroundColor: theme.primary, marginTop: 20 }]} onPress={() => setShowNodeModal(false)}>
+                        <react_native_1.TouchableOpacity accessibilityRole="button" accessibilityLabel="Close node selection" style={[styles.closeButton, { backgroundColor: theme.primary, marginTop: 20 }]} onPress={() => setShowNodeModal(false)}>
                           <react_native_1.Text style={{ color: '#fff' }}>Close</react_native_1.Text>
                         </react_native_1.TouchableOpacity>
                       </react_native_1.View>
@@ -289,13 +291,13 @@ PersistentKeepalive = 16`;
                   </react_native_1.Modal>
                 </>)}
 
-              <react_native_1.TouchableOpacity style={[
+              <react_native_1.TouchableOpacity accessibilityRole="button" accessibilityLabel="Create Client" accessibilityState={{ disabled: createDisabled, busy: isCreatingClient }} style={[
                 styles.createButton,
                 {
                     backgroundColor: theme.primary,
-                    opacity: !newClientName || !selectedRegion || !selectedNodeId || isCreatingClient ? 0.5 : 1,
+                    opacity: createDisabled ? 0.5 : 1,
                 },
-            ]} onPress={createVPNClient} disabled={!newClientName || !selectedRegion || !selectedNodeId || isCreatingClient}>
+            ]} onPress={createVPNClient} disabled={createDisabled}>
                 {isCreatingClient ? (<react_native_1.ActivityIndicator color="#ffffff" size="small"/>) : (<react_native_1.Text style={styles.createButtonText}>Create Client</react_native_1.Text>)}
               </react_native_1.TouchableOpacity>
             </react_native_1.View>

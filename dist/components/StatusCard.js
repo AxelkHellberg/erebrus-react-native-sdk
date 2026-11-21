@@ -19,8 +19,12 @@ const StatusCard = ({ vpnStatus, theme = {
     error: '#ef4444',
 }, }) => {
     const isConnected = vpnStatus?.isConnected;
-    const statusColor = isConnected ? theme.success : theme.error;
-    const statusText = isConnected ? 'Connected' : 'Disconnected';
+    const statusColor = vpnStatus
+        ? (isConnected ? theme.success : theme.error)
+        : theme.textSecondary;
+    const statusText = vpnStatus
+        ? (isConnected ? 'Connected' : 'Disconnected')
+        : 'Unknown';
     return (<react_native_1.View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <react_native_1.View style={styles.header}>
         <react_native_1.View style={[styles.statusDot, { backgroundColor: statusColor }]}/>

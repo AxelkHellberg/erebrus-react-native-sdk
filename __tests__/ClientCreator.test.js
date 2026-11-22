@@ -115,4 +115,31 @@ describe('ClientCreator node request ownership', () => {
     await act(async () => { pending.reject(new Error('obsolete')); });
     expect(console.error).not.toHaveBeenCalled();
   });
+  test.each([null, { region: 42 }, { id: 42 }, { id: '' }, { name: {} }, { chainName: [] }])('keeps valid nodes beside malformed record %j', async malformed => {
+    axios.get.mockResolvedValueOnce({ status: 200, data: { payload: [node('valid'), malformed === null ? null : { ...node('bad'), ...malformed }] } });
+    await act(async () => { renderer = create(render({ token: 'token', gatewayUrl: 'https://one.test/' })); });
+    selectUS();
+    expect(nodes()).toEqual(['valid']);
+    const list = renderer.root.findByType('FlatList');
+    expect(list.props.keyExtractor(list.props.data[0])).toBe('valid');
+    expect(() => create(list.props.renderItem({ item: list.props.data[0] }))).not.toThrow();
+  });
+
+  test.each([null, {}, 'invalid'])('reports invalid node list envelope %j', async payload => {
+    axios.get.mockResolvedValueOnce({ status: 200, data: { payload } });
+    await act(async () => { renderer = create(render({ token: 'token', gatewayUrl: 'https://one.test/' })); });
+    expect(renderer.root.findAllByType('Text').some(t => t.props.children === 'Failed to fetch available nodes')).toBe(true);
+    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(0);
+  });
+
+  test('keeps empty lists and optional node display fields compatible', async () => {
+    axios.get.mockResolvedValueOnce({ status: 200, data: { payload: [{ id: 'minimal', status: 'active', region: 'US' }, { ...node('inactive'), status: 'inactive' }] } });
+    await act(async () => { renderer = create(render({ token: 'token', gatewayUrl: 'https://one.test/' })); });
+    selectUS();
+    expect(nodes()).toEqual(['minimal']);
+    axios.get.mockResolvedValueOnce({ status: 200, data: { payload: [] } });
+    await act(async () => { renderer.update(render({ token: 'next', gatewayUrl: 'https://one.test/' })); });
+    expect(nodes()).toEqual([]);
+  });
+
 });

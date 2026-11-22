@@ -151,9 +151,21 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
                 if (!active)
                     return;
                 if (response.status === 200) {
-                    const payload = response.data.payload;
-                    const filteredNodes = payload.filter((node) => node.status === 'active' && node.region !== undefined && node.region !== null && node.region.trim());
-                    setNodesData(filteredNodes);
+                    const payload = response.data?.payload;
+                    if (!Array.isArray(payload))
+                        throw new Error('Invalid node list response');
+                    const filteredNodes = payload.filter((node) => node !== null && typeof node === 'object' &&
+                        typeof node.id === 'string' && !!node.id.trim() &&
+                        node.status === 'active' &&
+                        typeof node.region === 'string' && !!node.region.trim() &&
+                        (node.name === undefined || typeof node.name === 'string') &&
+                        (node.chainName === undefined || typeof node.chainName === 'string'));
+                    // A repeated ID cannot identify one selectable node, even across regions.
+                    const idCounts = new Map();
+                    for (const node of filteredNodes) {
+                        idCounts.set(node.id, (idCounts.get(node.id) || 0) + 1);
+                    }
+                    setNodesData(filteredNodes.filter(node => idCounts.get(node.id) === 1));
                 }
                 else {
                     setNodesError('Failed to fetch available nodes');

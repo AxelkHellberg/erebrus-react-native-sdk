@@ -189,7 +189,12 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
               (node.name === undefined || typeof node.name === 'string') &&
               (node.chainName === undefined || typeof node.chainName === 'string'),
           );
-          setNodesData(filteredNodes);
+          // A repeated ID cannot identify one selectable node, even across regions.
+          const idCounts = new Map<string, number>();
+          for (const node of filteredNodes) {
+            idCounts.set(node.id, (idCounts.get(node.id) || 0) + 1);
+          }
+          setNodesData(filteredNodes.filter(node => idCounts.get(node.id) === 1));
         } else {
           setNodesError('Failed to fetch available nodes');
         }

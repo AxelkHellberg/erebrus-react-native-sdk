@@ -324,6 +324,12 @@ Changing either clears the previous node selection. Equivalent config objects do
 not start another node request, and obsolete responses are ignored after a config
 change or unmount. Already-started HTTP requests are not cancelled.
 
+Node lookup keeps usable active records with unique IDs. If multiple usable active
+records share the same exact ID, all records with that ID are excluded, including
+duplicates in different regions. This avoids ambiguous selections and duplicate
+list keys while retaining other usable nodes in their original order. IDs remain
+case-sensitive and are not trimmed or otherwise rewritten.
+
 ### StatusCard
 
 A component for displaying VPN status information.

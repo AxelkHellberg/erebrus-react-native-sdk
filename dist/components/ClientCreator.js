@@ -58,6 +58,7 @@ const REGIONS = [
     { id: "AU", name: "Australia" },
     { id: "DE", name: "Germany" },
 ];
+const normalizeRegion = (region) => region.trim().toUpperCase();
 const ClientCreator = ({ apiConfig, onClientCreated, theme = {
     surface: '#ffffff',
     background: '#f5f5f5',
@@ -78,6 +79,9 @@ const ClientCreator = ({ apiConfig, onClientCreated, theme = {
     const [token, setToken] = (0, react_1.useState)(apiConfig.token);
     const [isLoadingNodes, setIsLoadingNodes] = (0, react_1.useState)(false);
     const [nodesError, setNodesError] = (0, react_1.useState)(null);
+    const availableRegions = Array.from(new Set(nodesData.map(node => normalizeRegion(node.region))))
+        .map(id => REGIONS.find(region => region.id === id) || { id, name: id });
+    const regionNodes = nodesData.filter(node => normalizeRegion(node.region) === selectedRegion);
     const handleTokenReceived = (newToken) => {
         setToken(newToken);
     };
@@ -232,7 +236,7 @@ PersistentKeepalive = 16`;
 
               <react_native_1.Text style={[styles.label, { color: theme.text }]}>Region</react_native_1.Text>
               <react_native_1.ScrollView horizontal style={{ marginBottom: 16 }} showsHorizontalScrollIndicator={false}>
-                {REGIONS.map((region) => (<react_native_1.TouchableOpacity key={region.id} style={[
+                {availableRegions.map((region) => (<react_native_1.TouchableOpacity key={region.id} style={[
                     styles.regionButton,
                     {
                         backgroundColor: selectedRegion === region.id ? theme.primary : theme.background,
@@ -257,7 +261,7 @@ PersistentKeepalive = 16`;
                         backgroundColor: theme.background,
                         borderColor: theme.border,
                     },
-                ]} onPress={() => setShowNodeModal(true)} disabled={!selectedRegion || nodesData.filter((n) => n.region === selectedRegion).length === 0}>
+                ]} onPress={() => setShowNodeModal(true)} disabled={!selectedRegion || regionNodes.length === 0}>
                     <react_native_1.Text style={{ color: theme.text }}>
                       {selectedNodeName || 'Select Node'}
                     </react_native_1.Text>
@@ -266,7 +270,7 @@ PersistentKeepalive = 16`;
                     <react_native_1.View style={styles.modalOverlay}>
                       <react_native_1.View style={[styles.modalContent, { backgroundColor: theme.surface }]}> 
                         <react_native_1.Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 10 }]}>Select Node</react_native_1.Text>
-                        <react_native_1.FlatList data={nodesData.filter((node) => node.region === selectedRegion)} keyExtractor={(item) => item.id} renderItem={({ item }) => (<react_native_1.TouchableOpacity style={[
+                        <react_native_1.FlatList data={regionNodes} keyExtractor={(item) => item.id} renderItem={({ item }) => (<react_native_1.TouchableOpacity style={[
                         styles.nodeItem,
                         {
                             backgroundColor: selectedNodeId === item.id ? theme.primary : theme.background,

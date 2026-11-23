@@ -59,6 +59,17 @@ The Auth component:
 - Exchanges the returned API key for a token
 - Calls `onTokenReceived` with the generated token
 
+Unmounting `Auth` cancels its local pending authentication flow and attempts to
+abort its requests when supported. Late results do not start a token request or
+call `onTokenReceived`. An organization request may already have reached the
+gateway; cancellation does not undo organization creation.
+
+Each authentication attempt has a 30-second total deadline, including both requests
+and response-body reads. A timeout stops waiting, reports an error, and aborts the
+requests when the platform supports `AbortController`. Late responses cannot deliver
+a token, and the SDK does not retry automatically. Organization creation may have
+completed on the gateway despite a timeout; check the gateway before trying again.
+
 ### Using the Connection Button
 
 ```tsx

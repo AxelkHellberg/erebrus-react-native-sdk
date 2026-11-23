@@ -76,6 +76,8 @@ const REGIONS: Region[] = [
   { id: "DE", name: "Germany" },
 ];
 
+const normalizeRegion = (region: string) => region.trim().toUpperCase();
+
 export const ClientCreator: React.FC<ClientCreatorProps> = ({
   apiConfig,
   onClientCreated,
@@ -100,6 +102,9 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
   const [token, setToken] = useState(apiConfig.token);
   const [isLoadingNodes, setIsLoadingNodes] = useState(false);
   const [nodesError, setNodesError] = useState<string | null>(null);
+  const availableRegions = Array.from(new Set(nodesData.map(node => normalizeRegion(node.region))))
+    .map(id => REGIONS.find(region => region.id === id) || { id, name: id });
+  const regionNodes = nodesData.filter(node => normalizeRegion(node.region) === selectedRegion);
 
   const handleTokenReceived = (newToken: string) => {
     setToken(newToken);
@@ -272,7 +277,7 @@ PersistentKeepalive = 16`;
 
               <Text style={[styles.label, { color: theme.text }]}>Region</Text>
               <ScrollView horizontal style={{ marginBottom: 16 }} showsHorizontalScrollIndicator={false}>
-                {REGIONS.map((region) => (
+                {availableRegions.map((region) => (
                   <TouchableOpacity
                     key={region.id}
                     style={[
@@ -311,7 +316,7 @@ PersistentKeepalive = 16`;
                       },
                     ]}
                     onPress={() => setShowNodeModal(true)}
-                    disabled={!selectedRegion || nodesData.filter((n) => n.region === selectedRegion).length === 0}
+                    disabled={!selectedRegion || regionNodes.length === 0}
                   >
                     <Text style={{ color: theme.text }}>
                       {selectedNodeName || 'Select Node'}
@@ -327,7 +332,7 @@ PersistentKeepalive = 16`;
                       <View style={[styles.modalContent, { backgroundColor: theme.surface }]}> 
                         <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 10 }]}>Select Node</Text>
                         <FlatList
-                          data={nodesData.filter((node) => node.region === selectedRegion)}
+                          data={regionNodes}
                           keyExtractor={(item) => item.id}
                           renderItem={({ item }) => (
                             <TouchableOpacity
@@ -497,4 +502,4 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-}); 
+});

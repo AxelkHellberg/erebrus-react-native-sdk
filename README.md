@@ -95,6 +95,8 @@ const VPNConnection = ({ vpnConfig }: { vpnConfig: VPNConfig | null }) => {
 
 ### Creating a New VPN Client
 
+Region choices reflect the active nodes returned by the configured gateway. Known country codes use their country names; other region codes remain selectable by code. Region matching ignores letter case and surrounding whitespace.
+
 ```tsx
 import { ClientCreator } from 'erebrus-react-native-sdk';
 

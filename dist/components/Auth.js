@@ -40,18 +40,41 @@ const Auth = ({ onTokenReceived }) => {
     const [isLoading, setIsLoading] = (0, react_1.useState)(false);
     const [status, setStatus] = (0, react_1.useState)('idle');
     const [errorMsg, setErrorMsg] = (0, react_1.useState)(null);
+    const mounted = (0, react_1.useRef)(true);
+    const pendingAttempts = (0, react_1.useRef)(new Set());
+    (0, react_1.useEffect)(() => {
+        mounted.current = true;
+        const attempts = pendingAttempts.current;
+        return () => {
+            mounted.current = false;
+            attempts.forEach(cancel => cancel());
+            attempts.clear();
+        };
+    }, []);
     const handleAuth = async () => {
+        if (!mounted.current)
+            return;
         setIsLoading(true);
         setStatus('idle');
         setErrorMsg(null);
         const controller = typeof AbortController === 'function' ? new AbortController() : undefined;
         let timeout;
+        let cancelled = false;
+        let cancelAttempt = () => { };
         const deadline = new Promise((_, reject) => {
+            cancelAttempt = () => {
+                cancelled = true;
+                clearTimeout(timeout);
+                reject(new Error('Authentication cancelled'));
+                controller?.abort();
+            };
             timeout = setTimeout(() => {
                 reject(new Error('Authentication timed out. Organization creation may have completed; check the gateway before trying again.'));
                 controller?.abort();
             }, 30000);
         });
+        pendingAttempts.current.add(cancelAttempt);
+        const isCurrent = () => !cancelled && mounted.current;
         try {
             // Step 1: Create organization
             const orgRes = await Promise.race([fetch('https://gateway.dev.netsepio.com/api/v1.1/organisation', {
@@ -59,7 +82,11 @@ const Auth = ({ onTokenReceived }) => {
                     headers: { 'Content-Type': 'application/json' },
                     signal: controller?.signal,
                 }), deadline]);
+            if (!isCurrent())
+                return;
             const orgData = await Promise.race([orgRes.json(), deadline]);
+            if (!isCurrent())
+                return;
             if (!orgRes.ok) {
                 const msg = orgData?.message || 'Failed to create organization';
                 setErrorMsg(msg);
@@ -80,7 +107,11 @@ const Auth = ({ onTokenReceived }) => {
                     headers: { 'X-ORG-API-KEY': apiKey },
                     signal: controller?.signal,
                 }), deadline]);
+            if (!isCurrent())
+                return;
             const tokenData = await Promise.race([tokenRes.json(), deadline]);
+            if (!isCurrent())
+                return;
             if (!tokenRes.ok) {
                 const msg = tokenData?.message || 'Failed to generate token';
                 setErrorMsg(msg);
@@ -99,13 +130,17 @@ const Auth = ({ onTokenReceived }) => {
             onTokenReceived(token);
         }
         catch (e) {
-            setErrorMsg(e?.message || 'Unknown error');
-            setStatus('error');
-            console.error('Auth error:', e);
+            if (isCurrent()) {
+                setErrorMsg(e?.message || 'Unknown error');
+                setStatus('error');
+                console.error('Auth error:', e);
+            }
         }
         finally {
             clearTimeout(timeout);
-            setIsLoading(false);
+            pendingAttempts.current.delete(cancelAttempt);
+            if (isCurrent())
+                setIsLoading(false);
         }
     };
     return (<react_native_1.View style={styles.container}>

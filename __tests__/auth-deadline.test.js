@@ -29,6 +29,12 @@ function renderAuth({ fetch, AbortController: Controller = AbortController }) {
       if (!(slot in state)) state[slot] = initial;
       return [state[slot], value => { state[slot] = value; }];
     },
+    useRef(initial) {
+      const slot = index++;
+      if (!(slot in state)) state[slot] = { current: initial };
+      return state[slot];
+    },
+    useEffect() {},
     createElement(type, props, ...children) { return { type, props: props || {}, children }; },
   };
   const native = {

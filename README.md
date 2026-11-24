@@ -95,6 +95,8 @@ const VPNConnection = ({ vpnConfig }: { vpnConfig: VPNConfig | null }) => {
 
 ### Creating a New VPN Client
 
+If loading available nodes fails, select **Retry** to request the list again without remounting the component or changing authentication. The error and retry action are replaced by a loading indicator while that request is pending; lookups are not retried automatically.
+
 ```tsx
 import { ClientCreator } from 'erebrus-react-native-sdk';
 

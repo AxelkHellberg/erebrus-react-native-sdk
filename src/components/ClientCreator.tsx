@@ -299,7 +299,17 @@ PersistentKeepalive = 16`;
               {isLoadingNodes ? (
                 <ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 10 }} />
               ) : nodesError ? (
-                <Text style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</Text>
+                <View>
+                  <Text style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</Text>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="Retry loading nodes"
+                    style={[styles.retryButton, { backgroundColor: theme.primary }]}
+                    onPress={fetchNodesData}
+                  >
+                    <Text style={{ color: '#ffffff' }}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
               ) : (
                 <>
                   <TouchableOpacity
@@ -468,6 +478,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     alignItems: 'center',
   },
+  retryButton: {
+    alignSelf: 'flex-start',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
@@ -497,4 +513,4 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-}); 
+});

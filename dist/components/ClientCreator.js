@@ -250,7 +250,12 @@ PersistentKeepalive = 16`;
               </react_native_1.ScrollView>
 
               <react_native_1.Text style={[styles.label, { color: theme.text }]}>Node</react_native_1.Text>
-              {isLoadingNodes ? (<react_native_1.ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 10 }}/>) : nodesError ? (<react_native_1.Text style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</react_native_1.Text>) : (<>
+              {isLoadingNodes ? (<react_native_1.ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 10 }}/>) : nodesError ? (<react_native_1.View>
+                  <react_native_1.Text style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</react_native_1.Text>
+                  <react_native_1.TouchableOpacity accessibilityRole="button" accessibilityLabel="Retry loading nodes" style={[styles.retryButton, { backgroundColor: theme.primary }]} onPress={fetchNodesData}>
+                    <react_native_1.Text style={{ color: '#ffffff' }}>Retry</react_native_1.Text>
+                  </react_native_1.TouchableOpacity>
+                </react_native_1.View>) : (<>
                   <react_native_1.TouchableOpacity style={[
                     styles.nodeSelectButton,
                     {
@@ -380,6 +385,12 @@ const styles = react_native_1.StyleSheet.create({
         padding: 14,
         marginBottom: 16,
         alignItems: 'center',
+    },
+    retryButton: {
+        alignSelf: 'flex-start',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 10,
     },
     modalOverlay: {
         flex: 1,

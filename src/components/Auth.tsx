@@ -7,6 +7,7 @@ interface AuthProps {
 }
 
 const AUTH_TIMEOUT_MS = 30_000;
+const CALLBACK_WARNING = 'Token generated, but the application callback failed. Check the application before creating another organization.';
 
 export const Auth: React.FC<AuthProps> = ({
   onTokenReceived,
@@ -15,6 +16,7 @@ export const Auth: React.FC<AuthProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [callbackWarning, setCallbackWarning] = useState<string | null>(null);
   const gatewayBaseUrl = gatewayUrl.replace(/\/+$/, '');
   const attempt = useRef(0);
   const inFlight = useRef(false);
@@ -27,6 +29,7 @@ export const Auth: React.FC<AuthProps> = ({
     setIsLoading(inFlight.current);
     setStatus('idle');
     setErrorMsg(null);
+    setCallbackWarning(null);
     return () => { mounted.current = false; attempt.current += 1; };
   }, [gatewayBaseUrl]);
 
@@ -37,6 +40,17 @@ export const Auth: React.FC<AuthProps> = ({
     inFlight.current = true;
     const request = ++attempt.current;
     const isCurrent = () => request === attempt.current;
+    const notifyTokenReceived = (token: string) => {
+      const reportFailure = () => {
+        if (mounted.current && isCurrent()) setCallbackWarning(CALLBACK_WARNING);
+      };
+      try {
+        // Application notification errors do not invalidate the completed authentication.
+        void Promise.resolve(onTokenReceived(token)).catch(reportFailure);
+      } catch {
+        reportFailure();
+      }
+    };
     const controller = typeof AbortController === 'undefined' ? undefined : new AbortController();
     let interrupt: (error: Error) => void = () => {};
     const interrupted = new Promise<never>((_, reject) => { interrupt = reject; });
@@ -55,6 +69,7 @@ export const Auth: React.FC<AuthProps> = ({
     setIsLoading(true);
     setStatus('idle');
     setErrorMsg(null);
+    setCallbackWarning(null);
     try {
       // Step 1: Create organization
       const orgRes = await bounded(fetch(`${gatewayBaseUrl}/api/v1.1/organisation`, {
@@ -107,7 +122,7 @@ export const Auth: React.FC<AuthProps> = ({
       }
 
       setStatus('success');
-      onTokenReceived(token);
+      notifyTokenReceived(token);
     } catch (e: unknown) {
       if (!isCurrent()) return;
       const message = typeof e === 'string' ? e
@@ -137,6 +152,9 @@ export const Auth: React.FC<AuthProps> = ({
         )}
       </TouchableOpacity>
       {status === 'success' && <Text style={styles.success}>Token generated!</Text>}
+      {callbackWarning && (
+        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.warning}>{callbackWarning}</Text>
+      )}
       {status === 'error' && (
         <Text style={styles.error}>{errorMsg || 'Something went wrong. Try again.'}</Text>
       )}
@@ -170,6 +188,11 @@ const styles = StyleSheet.create({
   },
   error: {
     color: '#ef4444',
+    fontSize: 16,
+    marginTop: 8,
+  },
+  warning: {
+    color: '#92400e',
     fontSize: 16,
     marginTop: 8,
   },

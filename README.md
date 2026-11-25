@@ -69,6 +69,14 @@ A timeout or cancellation cannot undo an organization request already sent to th
 server. Check the gateway before starting another attempt: the organization may
 already exist. No automatic retry is made.
 
+After a token is generated, a synchronous exception or asynchronous rejection from
+`onTokenReceived` leaves authentication successful and displays a callback warning.
+Check the application's callback and secure token storage before creating another
+organization. The warning does not include the token or callback error details, and
+the SDK does not resend either request or repeat the callback automatically. An
+asynchronous callback does not extend the authentication loading state or deadline;
+late callback failures are ignored after a gateway change, unmount or newer attempt.
+
 ### Using the Connection Button
 
 ```tsx

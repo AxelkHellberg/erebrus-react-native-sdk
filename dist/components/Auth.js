@@ -37,10 +37,12 @@ exports.Auth = void 0;
 const react_1 = __importStar(require("react"));
 const react_native_1 = require("react-native");
 const AUTH_TIMEOUT_MS = 30_000;
+const CALLBACK_WARNING = 'Token generated, but the application callback failed. Check the application before creating another organization.';
 const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/', }) => {
     const [isLoading, setIsLoading] = (0, react_1.useState)(false);
     const [status, setStatus] = (0, react_1.useState)('idle');
     const [errorMsg, setErrorMsg] = (0, react_1.useState)(null);
+    const [callbackWarning, setCallbackWarning] = (0, react_1.useState)(null);
     const gatewayBaseUrl = gatewayUrl.replace(/\/+$/, '');
     const attempt = (0, react_1.useRef)(0);
     const inFlight = (0, react_1.useRef)(false);
@@ -52,6 +54,7 @@ const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/
         setIsLoading(inFlight.current);
         setStatus('idle');
         setErrorMsg(null);
+        setCallbackWarning(null);
         return () => { mounted.current = false; attempt.current += 1; };
     }, [gatewayBaseUrl]);
     (0, react_1.useEffect)(() => () => { cancelPending.current?.(); }, []);
@@ -61,6 +64,19 @@ const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/
         inFlight.current = true;
         const request = ++attempt.current;
         const isCurrent = () => request === attempt.current;
+        const notifyTokenReceived = (token) => {
+            const reportFailure = () => {
+                if (mounted.current && isCurrent())
+                    setCallbackWarning(CALLBACK_WARNING);
+            };
+            try {
+                // Application notification errors do not invalidate the completed authentication.
+                void Promise.resolve(onTokenReceived(token)).catch(reportFailure);
+            }
+            catch {
+                reportFailure();
+            }
+        };
         const controller = typeof AbortController === 'undefined' ? undefined : new AbortController();
         let interrupt = () => { };
         const interrupted = new Promise((_, reject) => { interrupt = reject; });
@@ -79,6 +95,7 @@ const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/
         setIsLoading(true);
         setStatus('idle');
         setErrorMsg(null);
+        setCallbackWarning(null);
         try {
             // Step 1: Create organization
             const orgRes = await bounded(fetch(`${gatewayBaseUrl}/api/v1.1/organisation`, {
@@ -133,7 +150,7 @@ const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/
                 return;
             }
             setStatus('success');
-            onTokenReceived(token);
+            notifyTokenReceived(token);
         }
         catch (e) {
             if (!isCurrent())
@@ -158,6 +175,7 @@ const Auth = ({ onTokenReceived, gatewayUrl = 'https://gateway.dev.netsepio.com/
         {isLoading ? (<react_native_1.ActivityIndicator color="#fff"/>) : (<react_native_1.Text style={styles.buttonText}>Create Organization & Get Token</react_native_1.Text>)}
       </react_native_1.TouchableOpacity>
       {status === 'success' && <react_native_1.Text style={styles.success}>Token generated!</react_native_1.Text>}
+      {callbackWarning && (<react_native_1.Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.warning}>{callbackWarning}</react_native_1.Text>)}
       {status === 'error' && (<react_native_1.Text style={styles.error}>{errorMsg || 'Something went wrong. Try again.'}</react_native_1.Text>)}
     </react_native_1.View>);
 };
@@ -188,6 +206,11 @@ const styles = react_native_1.StyleSheet.create({
     },
     error: {
         color: '#ef4444',
+        fontSize: 16,
+        marginTop: 8,
+    },
+    warning: {
+        color: '#92400e',
         fontSize: 16,
         marginTop: 8,
     },

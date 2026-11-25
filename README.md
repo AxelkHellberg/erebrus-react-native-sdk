@@ -59,10 +59,23 @@ The Auth component:
 - Exchanges the returned API key for a token
 - Calls `onTokenReceived` with the generated token
 
-While authentication is pending, additional taps are ignored until both the
-organization and token response bodies settle. Changing the gateway discards the
-old result but keeps the pending flow locked until it settles; it does not cancel
-an organization request already sent to the server. No automatic retry is made.
+Authentication has a 30-second deadline covering both requests and their response
+bodies. Additional taps are ignored until the flow settles or times out. Changing
+the gateway discards the old result while retaining that bounded wait. Unmounting
+aborts the pending transport where supported and clears the deadline. Late results
+are ignored, including when the native transport does not honor cancellation.
+
+A timeout or cancellation cannot undo an organization request already sent to the
+server. Check the gateway before starting another attempt: the organization may
+already exist. No automatic retry is made.
+
+After a token is generated, a synchronous exception or asynchronous rejection from
+`onTokenReceived` leaves authentication successful and displays a callback warning.
+Check the application's callback and secure token storage before creating another
+organization. The warning does not include the token or callback error details, and
+the SDK does not resend either request or repeat the callback automatically. An
+asynchronous callback does not extend the authentication loading state or deadline;
+late callback failures are ignored after a gateway change, unmount or newer attempt.
 
 ### Using the Connection Button
 

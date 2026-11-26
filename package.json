@@ -7,7 +7,9 @@
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
-    "test": "jest"
+    "test": "jest",
+    "test:types": "tsc --noEmit --strict --skipLibCheck --esModuleInterop --jsx react --target ES2020 --moduleResolution node __tests__/client-config.types.tsx",
+    "test:example": "tsc --project tsconfig.example.json"
   },
   "keywords": [
     "react-native",

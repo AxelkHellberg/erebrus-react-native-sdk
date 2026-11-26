@@ -324,6 +324,18 @@ The SDK includes TypeScript types for all components and functions:
 - `Theme`
 - `WireGuardStatus`
 
+## Development checks
+
+After installing the development dependencies, build the SDK and check its consumer examples:
+
+```bash
+npm run build
+npm run test:types
+npm run test:example
+```
+
+The example check resolves `erebrus-react-native-sdk` to this checkout's built `dist` declarations and emits no files. It checks `example/App.tsx` against the current SDK API rather than the installed registry copy. These checks do not launch the app or connect to a VPN.
+
 ## License
 
 MIT

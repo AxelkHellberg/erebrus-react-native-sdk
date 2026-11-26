@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState, useCallback, useRef } from "react"
+import React, { useState, useCallback } from "react"
 import {
   View,
   Text,
@@ -8,21 +8,12 @@ import {
   StatusBar,
   SafeAreaView,
   TouchableOpacity,
-  ActivityIndicator,
-  Alert,
   ScrollView,
   useColorScheme,
   Modal,
-  TextInput,
-  Animated,
 } from "react-native"
-import WireGuardVpnModule, { type WireGuardStatus } from "react-native-wireguard-vpn-connect"
 import 'react-native-get-random-values'
-import { Buffer } from 'buffer'
-import { generateKeyPair } from 'curve25519-js'
-import CryptoJS from "crypto-js"  
 import QRCode from "react-native-qrcode-svg"
-import axios from "axios"
 import {
   VPNProvider,
   ConnectionButton,
@@ -33,18 +24,6 @@ import {
   type VPNConfig,
   Auth,
 } from 'erebrus-react-native-sdk'
-
-interface WireGuardConfig {
-  privateKey: string
-  publicKey: string
-  serverAddress: string
-  serverPort: number
-  allowedIPs: string[]
-  dns?: string[]
-  mtu?: number
-  presharedKey?: string
-  persistentKeepalive?: number
-}
 
 interface Node {
   id: string
@@ -103,7 +82,7 @@ const VPNScreen = () => {
   const { vpnStatus, isConnecting, isDisconnecting, connectVPN, disconnectVPN } = useVPN()
   const [showCreateModal, setShowCreateModal] = useState(false)
   // const [showQrCodeModal, setShowQrCodeModal] = useState(false)
-  const [currentConfig, setCurrentConfig] = useState<WireGuardConfig | null>(null)
+  const [currentConfig, setCurrentConfig] = useState<VPNConfig | null>(null)
   const [configFile, setConfigFile] = useState<string>("")
   const [token, setToken] = useState<string>("")
 
@@ -238,51 +217,6 @@ const App = () => {
     </VPNProvider>
   )
 }
-
-interface StatusRowProps {
-  label: string
-  value: string
-  valueColor?: string
-  theme: any
-}
-
-const StatusRow: React.FC<StatusRowProps> = ({ label, value, valueColor, theme }) => (
-  <View style={styles.statusRow}>
-    <Text style={[styles.statusLabel, { color: theme.textSecondary }]}>{label}:</Text>
-    <Text style={[styles.statusValue, { color: valueColor || theme.text }]}>{value}</Text>
-  </View>
-)
-
-interface ActionButtonProps {
-  title: string
-  onPress: () => void
-  disabled?: boolean
-  loading?: boolean
-  style?: any
-  textStyle?: any
-}
-
-const ActionButton: React.FC<ActionButtonProps> = ({
-  title,
-  onPress,
-  disabled = false,
-  loading = false,
-  style,
-  textStyle,
-}) => (
-  <TouchableOpacity
-    style={[styles.actionButton, style, disabled && styles.disabledButton]}
-    onPress={onPress}
-    disabled={disabled}
-    activeOpacity={0.7}
-  >
-    {loading ? (
-      <ActivityIndicator color="#ffffff" size="small" />
-    ) : (
-      <Text style={[styles.actionButtonText, textStyle]}>{title}</Text>
-    )}
-  </TouchableOpacity>
-)
 
 const styles = StyleSheet.create({
   container: {

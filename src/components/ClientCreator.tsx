@@ -20,8 +20,14 @@ import axios from 'axios';
 import { generateKeyPair } from 'curve25519-js';
 import QRCode from 'react-native-qrcode-svg';
 import { Auth } from './Auth';
-// @ts-ignore
 
+const clientCreationErrorMessage = (error: unknown): string => {
+  const message = typeof error === 'string' ? error :
+    error !== null && typeof error === 'object' && 'message' in error ? error.message : undefined;
+  return typeof message === 'string' && message.trim() ? message : 'Unknown error occurred';
+};
+
+// @ts-ignore
 interface Node {
   id: string;
   name: string;
@@ -92,7 +98,7 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
   const [newClientName, setNewClientName] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('');
   const [isCreatingClient, setIsCreatingClient] = useState(false);
-  const creationInFlight = useRef(false);
+  const creationAttempt = useRef<{ cancel: () => void } | null>(null);
   const creationGeneration = useRef(0);
   const mounted = useRef(false);
   const [nodesData, setNodesData] = useState<Node[]>([]);
@@ -113,6 +119,8 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
     setAuthentication({ suppliedToken: apiConfig.token, gatewayUrl, token: apiConfig.token });
   }
   const token = sameAuthentication ? authentication.token : apiConfig.token;
+  const currentAuthentication = useRef({ gatewayUrl, token });
+  currentAuthentication.current = { gatewayUrl, token };
   const [isLoadingNodes, setIsLoadingNodes] = useState(false);
   const [nodesError, setNodesError] = useState<string | null>(null);
 
@@ -124,6 +132,7 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
     return () => {
       mounted.current = false;
       creationGeneration.current += 1;
+      creationAttempt.current?.cancel();
     };
   }, [gatewayUrl, token]);
 
@@ -200,7 +209,9 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
   }, [gatewayUrl, token]);
 
   const createVPNClient = useCallback(async () => {
-    if (creationInFlight.current || !mounted.current) return;
+    if (creationAttempt.current || !mounted.current ||
+        currentAuthentication.current.gatewayUrl !== gatewayUrl ||
+        currentAuthentication.current.token !== token) return;
     if (!token) {
       Alert.alert('Error', 'Please authenticate first');
       return;
@@ -211,10 +222,30 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
       return;
     }
     const generation = creationGeneration.current;
-    const isCurrent = () => mounted.current && generation === creationGeneration.current;
-    creationInFlight.current = true;
+    let cancelled = false;
+    const isCurrent = () => !cancelled && mounted.current && generation === creationGeneration.current;
+    const attempt = { cancel: () => {} };
+    creationAttempt.current = attempt;
     setIsCreatingClient(true);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
+      const controller = typeof AbortController === 'function' ? new AbortController() : undefined;
+      const abortRequest = () => {
+        // Cancellation is best-effort; an adapter may throw while aborting.
+        try { controller?.abort(); } catch {}
+      };
+      const deadline = new Promise<never>((_, reject) => {
+        attempt.cancel = () => {
+          cancelled = true;
+          clearTimeout(timeout);
+          reject(new Error('Client creation cancelled'));
+          abortRequest();
+        };
+        timeout = setTimeout(() => {
+          reject(new Error('Client creation timed out. The gateway may have created the client; check the gateway before trying again.'));
+          abortRequest();
+        }, 30000);
+      });
       const keys = generateKeys();
       const requestData = {
         name: newClientName,
@@ -226,7 +257,7 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
       console.log('POST URL:', url);
       console.log('Request body:', requestData);
 
-      const response = await fetch(url, {
+      const response = await Promise.race([fetch(url, {
         method: 'POST',
         headers: {
           Accept: 'application/json, text/plain, */*',
@@ -234,11 +265,12 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(requestData),
-      });
+        signal: controller?.signal,
+      }), deadline]);
 
       if (!isCurrent()) return;
       if (response.status === 200) {
-        const data = await response.json();
+        const data = await Promise.race([response.json(), deadline]);
         if (!isCurrent()) return;
         const payload = data?.payload;
         const client = payload?.client;
@@ -253,20 +285,6 @@ export const ClientCreator: React.FC<ClientCreatorProps> = ({
         const endpoint = payload.endpoint;
         const endpointHost = endpoint.includes(':') &&
           !(endpoint.startsWith('[') && endpoint.endsWith(']')) ? `[${endpoint}]` : endpoint;
-        const configFile = `
-[Interface]
-Address = ${client.Address[0]}
-PrivateKey = ${keys.privKey}
-DNS = 1.1.1.1
-
-[Peer]
-PublicKey = ${data.payload.serverPublicKey}
-PresharedKey = ${client.PresharedKey}
-AllowedIPs = 0.0.0.0/0, ::/0
-Endpoint = ${endpointHost}:51820
-PersistentKeepalive = 16`;
-        setConfigFile(configFile);
-        setShowQrCode(true);
         const vpnConfig = {
           privateKey: keys.privKey,
           publicKey: data.payload.serverPublicKey,
@@ -279,22 +297,38 @@ PersistentKeepalive = 16`;
           presharedKey: client.PresharedKey,
           persistentKeepalive: 16,
         };
+        const configFile = `
+[Interface]
+Address = ${vpnConfig.address}
+PrivateKey = ${vpnConfig.privateKey}
+DNS = ${vpnConfig.dns.join(', ')}
+MTU = ${vpnConfig.mtu}
+
+[Peer]
+PublicKey = ${vpnConfig.publicKey}
+PresharedKey = ${vpnConfig.presharedKey}
+AllowedIPs = ${vpnConfig.allowedIPs.join(', ')}
+Endpoint = ${endpointHost}:${vpnConfig.serverPort}
+PersistentKeepalive = ${vpnConfig.persistentKeepalive}`;
+        setConfigFile(configFile);
+        setShowQrCode(true);
         onClientCreated({ configFile, vpnConfig });
       } else {
-        const errorText = await response.text();
+        const errorText = await Promise.race([response.text(), deadline]);
         if (!isCurrent()) return;
         console.error('Failed to create VPN client:', errorText);
         Alert.alert('Error', `Failed to create VPN client: ${errorText}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (!isCurrent()) return;
       console.error('Failed to create VPN client:', error);
-      let errorMessage = 'Failed to create VPN client: ';
-      errorMessage += error.message || 'Unknown error occurred';
-      Alert.alert('Error', errorMessage);
+      Alert.alert('Error', `Failed to create VPN client: ${clientCreationErrorMessage(error)}`);
     } finally {
-      creationInFlight.current = false;
-      if (mounted.current) setIsCreatingClient(false);
+      clearTimeout(timeout);
+      if (creationAttempt.current === attempt) {
+        creationAttempt.current = null;
+        if (mounted.current) setIsCreatingClient(false);
+      }
     }
   }, [gatewayUrl, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
 

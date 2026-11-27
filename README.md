@@ -119,7 +119,7 @@ const CreateClient = () => {
 
 `ClientCreator` allows one client-creation request at a time, including response-body processing. Additional taps while it is pending do not create another client. The control becomes available again after success or failure.
 
-Changing the authentication token or gateway clears the displayed client configuration and ignores pending creation results from the previous context. Unmounting also suppresses result delivery. This does not cancel a request already sent to the gateway or undo a client created there; check the gateway before manually retrying an uncertain creation.
+Changing the authentication token or gateway clears the displayed client configuration and cancels the pending creation attempt. Unmounting also cancels it. Cancellation clears the deadline, attempts to abort the network request when supported, and prevents late responses or retained handlers from delivering obsolete configurations. It cannot undo a client already created on the gateway, and the SDK does not retry automatically; check the gateway before manually retrying an uncertain creation.
 
 ### Displaying VPN Status
 
@@ -322,7 +322,14 @@ A component for creating new VPN clients.
 `ClientCreator` follows updates to `apiConfig.token` and `apiConfig.gatewayUrl`.
 Changing either clears the previous node selection. Equivalent config objects do
 not start another node request, and obsolete responses are ignored after a config
-change or unmount. Already-started HTTP requests are not cancelled.
+change or unmount. A pending node lookup is ignored but is not cancelled by this
+change. Client creation has one 30-second deadline across the POST and
+response-body read. A configuration change or unmount cancels the creation
+attempt immediately; a timeout also settles it. These paths clear its timer,
+attempt cancellation when `AbortController` is available, release loading state
+while mounted, and ignore late results.
+The gateway may already have created the client; check it before manually
+trying again. The SDK does not retry automatically.
 
 ### StatusCard
 

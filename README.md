@@ -282,6 +282,16 @@ and its status refresh are pending, additional connection-change calls return
 without starting another native operation. Use `isConnecting` and `isDisconnecting`
 to display progress and retry the desired action after the active operation ends.
 
+Each native status read has a 30-second deadline, including the refresh after a
+completed connect or disconnect. A timeout logs a status-read failure, retains the
+last known status, and lets that completed connection change release its busy
+state. A newer refresh or provider unmount ends the previous status wait and
+clears its timer; late results are ignored. The native status read itself is not
+cancelled or retried. Native initialization, connect and disconnect operations
+are not timed out by this deadline; a pending native connection change continues
+to own the operation. A retained status can be stale, so use a later status
+refresh to confirm the tunnel state.
+
 ### ConnectionButton
 
 A customizable button component for VPN connection control.

@@ -46,6 +46,7 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const mounted = useRef(false);
   const statusRequest = useRef(0);
+  const statusAttempt = useRef<{ cancel: () => void } | null>(null);
   const operation = useRef<'connect' | 'disconnect' | null>(null);
 
   const initializeVPN = useCallback(async () => {
@@ -62,13 +63,31 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
   const updateStatus = useCallback(async () => {
     if (!mounted.current) return;
     const request = ++statusRequest.current;
+    statusAttempt.current?.cancel();
+    let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    let cancel = () => {};
+    const interrupted = new Promise<never>((_, reject) => {
+      cancel = () => {
+        cancelled = true;
+        clearTimeout(timeout);
+        reject(new Error('VPN status request cancelled'));
+      };
+      timeout = setTimeout(() => reject(new Error('VPN status request timed out')), 30_000);
+    });
+    const attempt = { cancel };
+    statusAttempt.current = attempt;
     try {
-      const status = await WireGuardVpnModule.getStatus();
-      if (mounted.current && request === statusRequest.current) setVpnStatus(status);
+      // A stalled read must not retain ownership after a native connection change completes.
+      const status = await Promise.race([WireGuardVpnModule.getStatus(), interrupted]);
+      if (!cancelled && mounted.current && request === statusRequest.current) setVpnStatus(status);
     } catch (error: any) {
-      if (mounted.current && request === statusRequest.current) {
+      if (!cancelled && mounted.current && request === statusRequest.current) {
         console.error("Failed to get VPN status:", error);
       }
+    } finally {
+      clearTimeout(timeout);
+      if (statusAttempt.current === attempt) statusAttempt.current = null;
     }
   }, []);
 
@@ -124,6 +143,7 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
     return () => {
       mounted.current = false;
       statusRequest.current += 1;
+      statusAttempt.current?.cancel();
     };
   }, [initializeVPN]);
 

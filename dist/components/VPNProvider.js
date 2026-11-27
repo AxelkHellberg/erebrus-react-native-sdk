@@ -56,6 +56,7 @@ const VPNProvider = ({ children }) => {
     const [isInitialized, setIsInitialized] = (0, react_1.useState)(false);
     const mounted = (0, react_1.useRef)(false);
     const statusRequest = (0, react_1.useRef)(0);
+    const statusAttempt = (0, react_1.useRef)(null);
     const operation = (0, react_1.useRef)(null);
     const initializeVPN = (0, react_1.useCallback)(async () => {
         try {
@@ -72,15 +73,35 @@ const VPNProvider = ({ children }) => {
         if (!mounted.current)
             return;
         const request = ++statusRequest.current;
+        statusAttempt.current?.cancel();
+        let cancelled = false;
+        let timeout;
+        let cancel = () => { };
+        const interrupted = new Promise((_, reject) => {
+            cancel = () => {
+                cancelled = true;
+                clearTimeout(timeout);
+                reject(new Error('VPN status request cancelled'));
+            };
+            timeout = setTimeout(() => reject(new Error('VPN status request timed out')), 30_000);
+        });
+        const attempt = { cancel };
+        statusAttempt.current = attempt;
         try {
-            const status = await react_native_wireguard_vpn_connect_1.default.getStatus();
-            if (mounted.current && request === statusRequest.current)
+            // A stalled read must not retain ownership after a native connection change completes.
+            const status = await Promise.race([react_native_wireguard_vpn_connect_1.default.getStatus(), interrupted]);
+            if (!cancelled && mounted.current && request === statusRequest.current)
                 setVpnStatus(status);
         }
         catch (error) {
-            if (mounted.current && request === statusRequest.current) {
+            if (!cancelled && mounted.current && request === statusRequest.current) {
                 console.error("Failed to get VPN status:", error);
             }
+        }
+        finally {
+            clearTimeout(timeout);
+            if (statusAttempt.current === attempt)
+                statusAttempt.current = null;
         }
     }, []);
     const connectVPN = (0, react_1.useCallback)(async (config) => {
@@ -136,6 +157,7 @@ const VPNProvider = ({ children }) => {
         return () => {
             mounted.current = false;
             statusRequest.current += 1;
+            statusAttempt.current?.cancel();
         };
     }, [initializeVPN]);
     const value = {

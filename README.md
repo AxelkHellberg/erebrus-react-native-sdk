@@ -278,6 +278,7 @@ A hook that provides access to VPN functionality.
 - `isConnecting`: Whether the VPN is currently connecting
 - `isDisconnecting`: Whether the VPN is currently disconnecting
 - `isInitialized`: Whether the VPN module is initialized
+- `initializeVPN`: Explicitly retry native initialization after a failed attempt
 - `connectVPN`: Function to connect to VPN
 - `disconnectVPN`: Function to disconnect from VPN
 - `updateStatus`: Function to update VPN status
@@ -286,6 +287,32 @@ Connection changes are single flight per provider: while a connect or disconnect
 and its status refresh are pending, additional connection-change calls return
 without starting another native operation. Use `isConnecting` and `isDisconnecting`
 to display progress and retry the desired action after the active operation ends.
+
+The provider initializes on mount. On Android, the native module can open the VPN
+permission prompt and reject that first initialization while the user decides.
+After granting permission, call `initializeVPN()` from an explicit retry action;
+`connectVPN()` remains blocked until initialization succeeds. For example:
+
+```tsx
+import { Button } from 'react-native';
+import { useVPN } from 'erebrus-react-native-sdk';
+
+const RetryVPNSetup = () => {
+  const { isInitialized, initializeVPN } = useVPN();
+  return (
+    <Button
+      title="Retry VPN setup"
+      disabled={isInitialized}
+      onPress={() => { void initializeVPN(); }}
+    />
+  );
+};
+```
+
+Concurrent retries share the pending native attempt. A successful initialization
+is not repeated; a failed attempt keeps `isInitialized` false and reports through
+the existing initialization alert. There is no automatic retry, native operation
+cancellation or new timeout. Unmounting suppresses obsolete results and retries.
 
 ### ConnectionButton
 

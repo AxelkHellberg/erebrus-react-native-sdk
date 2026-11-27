@@ -17,6 +17,7 @@ interface VPNContextType {
     isConnecting: boolean;
     isDisconnecting: boolean;
     isInitialized: boolean;
+    initializeVPN: () => Promise<void>;
     connectVPN: (config: VPNConfig) => Promise<void>;
     disconnectVPN: () => Promise<void>;
     updateStatus: () => Promise<void>;

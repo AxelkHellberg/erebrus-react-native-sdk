@@ -57,6 +57,8 @@ const VPNProvider = ({ children }) => {
     const mounted = (0, react_1.useRef)(false);
     const lifecycle = (0, react_1.useRef)(0);
     const statusRequest = (0, react_1.useRef)(0);
+    const initialized = (0, react_1.useRef)(false);
+    const initialization = (0, react_1.useRef)(null);
     const operation = (0, react_1.useRef)(null);
     const updateStatus = (0, react_1.useCallback)(async () => {
         if (!mounted.current)
@@ -74,7 +76,7 @@ const VPNProvider = ({ children }) => {
         }
     }, []);
     const connectVPN = (0, react_1.useCallback)(async (config) => {
-        if (!mounted.current || operation.current !== null || !isInitialized) {
+        if (!mounted.current || operation.current !== null || !initialized.current) {
             return;
         }
         const generation = lifecycle.current;
@@ -107,7 +109,7 @@ const VPNProvider = ({ children }) => {
             if (isCurrent())
                 setIsConnecting(false);
         }
-    }, [isInitialized, updateStatus]);
+    }, [updateStatus]);
     const disconnectVPN = (0, react_1.useCallback)(async () => {
         if (!mounted.current || operation.current !== null)
             return;
@@ -132,15 +134,25 @@ const VPNProvider = ({ children }) => {
                 setIsDisconnecting(false);
         }
     }, [updateStatus]);
-    (0, react_1.useEffect)(() => {
-        mounted.current = true;
-        const generation = ++lifecycle.current;
+    const initializeVPN = (0, react_1.useCallback)(function initializeVPN() {
+        if (!mounted.current || initialized.current)
+            return Promise.resolve();
+        const generation = lifecycle.current;
+        const pending = initialization.current;
+        if (pending) {
+            // A remounted effect must wait for an obsolete native attempt to settle.
+            return pending.generation === generation ? pending.promise : pending.promise.then(initializeVPN);
+        }
         const isCurrent = () => mounted.current && lifecycle.current === generation;
-        const initializeVPN = async () => {
+        const attempt = { generation, promise: Promise.resolve() };
+        attempt.promise = Promise.resolve().then(async () => {
             try {
+                if (!isCurrent())
+                    return;
                 await react_native_wireguard_vpn_connect_1.default.initialize();
                 if (!isCurrent())
                     return;
+                initialized.current = true;
                 setIsInitialized(true);
                 await updateStatus();
             }
@@ -150,19 +162,33 @@ const VPNProvider = ({ children }) => {
                 console.error("VPN initialization failed:", error);
                 react_native_1.Alert.alert("Initialization Error", error.message || "Unknown error occurred");
             }
-        };
+            finally {
+                if (initialization.current === attempt)
+                    initialization.current = null;
+            }
+        });
+        initialization.current = attempt;
+        return attempt.promise;
+    }, [updateStatus]);
+    (0, react_1.useEffect)(() => {
+        mounted.current = true;
+        lifecycle.current += 1;
+        initialized.current = false;
+        setIsInitialized(false);
         void initializeVPN();
         return () => {
             mounted.current = false;
+            initialized.current = false;
             lifecycle.current += 1;
             statusRequest.current += 1;
         };
-    }, [updateStatus]);
+    }, [initializeVPN]);
     const value = {
         vpnStatus,
         isConnecting,
         isDisconnecting,
         isInitialized,
+        initializeVPN,
         connectVPN,
         disconnectVPN,
         updateStatus,

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import WireGuardVpnModule, { type WireGuardStatus } from "react-native-wireguard-vpn-connect";
 import { Alert } from 'react-native';
 
@@ -44,6 +44,10 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const mounted = useRef(false);
+  const statusRequest = useRef(0);
+  const statusAttempt = useRef<{ cancel: () => void } | null>(null);
+  const operation = useRef<'connect' | 'disconnect' | null>(null);
 
   const initializeVPN = useCallback(async () => {
     try {
@@ -57,19 +61,42 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
   }, []);
 
   const updateStatus = useCallback(async () => {
+    if (!mounted.current) return;
+    const request = ++statusRequest.current;
+    statusAttempt.current?.cancel();
+    let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    let cancel = () => {};
+    const interrupted = new Promise<never>((_, reject) => {
+      cancel = () => {
+        cancelled = true;
+        clearTimeout(timeout);
+        reject(new Error('VPN status request cancelled'));
+      };
+      timeout = setTimeout(() => reject(new Error('VPN status request timed out')), 30_000);
+    });
+    const attempt = { cancel };
+    statusAttempt.current = attempt;
     try {
-      const status = await WireGuardVpnModule.getStatus();
-      setVpnStatus(status);
+      // A stalled read must not retain ownership after a native connection change completes.
+      const status = await Promise.race([WireGuardVpnModule.getStatus(), interrupted]);
+      if (!cancelled && mounted.current && request === statusRequest.current) setVpnStatus(status);
     } catch (error: any) {
-      console.error("Failed to get VPN status:", error);
+      if (!cancelled && mounted.current && request === statusRequest.current) {
+        console.error("Failed to get VPN status:", error);
+      }
+    } finally {
+      clearTimeout(timeout);
+      if (statusAttempt.current === attempt) statusAttempt.current = null;
     }
   }, []);
 
   const connectVPN = useCallback(async (config: VPNConfig) => {
-    if (isConnecting || !isInitialized) {
+    if (operation.current !== null || !isInitialized) {
       return;
     }
 
+    operation.current = 'connect';
     setIsConnecting(true);
     try {
       if (!config.privateKey || !config.publicKey) {
@@ -88,13 +115,15 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
       }
       Alert.alert("Connection Failed", errorMessage);
     } finally {
+      operation.current = null;
       setIsConnecting(false);
     }
-  }, [isConnecting, isInitialized, updateStatus]);
+  }, [isInitialized, updateStatus]);
 
   const disconnectVPN = useCallback(async () => {
-    if (isDisconnecting) return;
+    if (operation.current !== null) return;
 
+    operation.current = 'disconnect';
     setIsDisconnecting(true);
     try {
       await WireGuardVpnModule.disconnect();
@@ -103,12 +132,19 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
       console.error("Disconnection failed:", error);
       Alert.alert("Disconnection Failed", error.message || "Unknown error occurred");
     } finally {
+      operation.current = null;
       setIsDisconnecting(false);
     }
-  }, [isDisconnecting, updateStatus]);
+  }, [updateStatus]);
 
   useEffect(() => {
+    mounted.current = true;
     initializeVPN();
+    return () => {
+      mounted.current = false;
+      statusRequest.current += 1;
+      statusAttempt.current?.cancel();
+    };
   }, [initializeVPN]);
 
   const value = {
@@ -122,4 +158,4 @@ export const VPNProvider: React.FC<VPNProviderProps> = ({ children }) => {
   };
 
   return <VPNContext.Provider value={value}>{children}</VPNContext.Provider>;
-}; 
+};

@@ -58,14 +58,16 @@ const REGIONS = [
     { id: "AU", name: "Australia" },
     { id: "DE", name: "Germany" },
 ];
-const ClientCreator = ({ apiConfig, onClientCreated, theme = {
-    surface: '#ffffff',
-    background: '#f5f5f5',
-    text: '#000000',
-    textSecondary: '#6b7280',
-    primary: '#6366f1',
-    border: '#e5e7eb',
-}, }) => {
+const ClientCreator = ({ apiConfig, onClientCreated, theme, }) => {
+    const resolvedTheme = {
+        surface: '#ffffff',
+        background: '#f5f5f5',
+        text: '#000000',
+        textSecondary: '#6b7280',
+        primary: '#6366f1',
+        border: '#e5e7eb',
+        ...theme,
+    };
     const [newClientName, setNewClientName] = (0, react_1.useState)('');
     const [selectedRegion, setSelectedRegion] = (0, react_1.useState)('');
     const [isCreatingClient, setIsCreatingClient] = (0, react_1.useState)(false);
@@ -215,73 +217,73 @@ PersistentKeepalive = 16`;
             setIsCreatingClient(false);
         }
     }, [apiConfig, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
-    return (<react_native_1.ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-      {!token ? (<Auth_1.Auth onTokenReceived={handleTokenReceived} theme={theme}/>) : (<>
-          <react_native_1.View style={[styles.section, { backgroundColor: theme.surface }]}>
-            <react_native_1.Text style={[styles.sectionTitle, { color: theme.text }]}>Create New Client</react_native_1.Text>
+    return (<react_native_1.ScrollView style={[styles.container, { backgroundColor: resolvedTheme.background }]}>
+      {!token ? (<Auth_1.Auth onTokenReceived={handleTokenReceived} theme={resolvedTheme}/>) : (<>
+          <react_native_1.View style={[styles.section, { backgroundColor: resolvedTheme.surface }]}>
+            <react_native_1.Text style={[styles.sectionTitle, { color: resolvedTheme.text }]}>Create New Client</react_native_1.Text>
             <react_native_1.View style={styles.form}>
-              <react_native_1.Text style={[styles.label, { color: theme.text }]}>Client Name</react_native_1.Text>
+              <react_native_1.Text style={[styles.label, { color: resolvedTheme.text }]}>Client Name</react_native_1.Text>
               <react_native_1.TextInput style={[
                 styles.input,
                 {
-                    backgroundColor: theme.background,
-                    borderColor: theme.border,
-                    color: theme.text,
+                    backgroundColor: resolvedTheme.background,
+                    borderColor: resolvedTheme.border,
+                    color: resolvedTheme.text,
                 },
-            ]} value={newClientName} onChangeText={setNewClientName} placeholder="Enter client name (max 8 chars)" placeholderTextColor={theme.textSecondary} maxLength={8}/>
+            ]} value={newClientName} onChangeText={setNewClientName} placeholder="Enter client name (max 8 chars)" placeholderTextColor={resolvedTheme.textSecondary} maxLength={8}/>
 
-              <react_native_1.Text style={[styles.label, { color: theme.text }]}>Region</react_native_1.Text>
+              <react_native_1.Text style={[styles.label, { color: resolvedTheme.text }]}>Region</react_native_1.Text>
               <react_native_1.ScrollView horizontal style={{ marginBottom: 16 }} showsHorizontalScrollIndicator={false}>
                 {REGIONS.map((region) => (<react_native_1.TouchableOpacity key={region.id} style={[
                     styles.regionButton,
                     {
-                        backgroundColor: selectedRegion === region.id ? theme.primary : theme.background,
-                        borderColor: theme.border,
+                        backgroundColor: selectedRegion === region.id ? resolvedTheme.primary : resolvedTheme.background,
+                        borderColor: resolvedTheme.border,
                     },
                 ]} onPress={() => {
                     setSelectedRegion(region.id);
                     setSelectedNodeId('');
                     setSelectedNodeName('');
                 }}>
-                    <react_native_1.Text style={{ color: selectedRegion === region.id ? '#fff' : theme.text }}>
+                    <react_native_1.Text style={{ color: selectedRegion === region.id ? '#fff' : resolvedTheme.text }}>
                       {region.name}
                     </react_native_1.Text>
                   </react_native_1.TouchableOpacity>))}
               </react_native_1.ScrollView>
 
-              <react_native_1.Text style={[styles.label, { color: theme.text }]}>Node</react_native_1.Text>
-              {isLoadingNodes ? (<react_native_1.ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 10 }}/>) : nodesError ? (<react_native_1.Text style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</react_native_1.Text>) : (<>
+              <react_native_1.Text style={[styles.label, { color: resolvedTheme.text }]}>Node</react_native_1.Text>
+              {isLoadingNodes ? (<react_native_1.ActivityIndicator size="small" color={resolvedTheme.primary} style={{ marginVertical: 10 }}/>) : nodesError ? (<react_native_1.Text style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</react_native_1.Text>) : (<>
                   <react_native_1.TouchableOpacity style={[
                     styles.nodeSelectButton,
                     {
-                        backgroundColor: theme.background,
-                        borderColor: theme.border,
+                        backgroundColor: resolvedTheme.background,
+                        borderColor: resolvedTheme.border,
                     },
                 ]} onPress={() => setShowNodeModal(true)} disabled={!selectedRegion || nodesData.filter((n) => n.region === selectedRegion).length === 0}>
-                    <react_native_1.Text style={{ color: theme.text }}>
+                    <react_native_1.Text style={{ color: resolvedTheme.text }}>
                       {selectedNodeName || 'Select Node'}
                     </react_native_1.Text>
                   </react_native_1.TouchableOpacity>
                   <react_native_1.Modal visible={showNodeModal} animationType="slide" transparent={true} onRequestClose={() => setShowNodeModal(false)}>
                     <react_native_1.View style={styles.modalOverlay}>
-                      <react_native_1.View style={[styles.modalContent, { backgroundColor: theme.surface }]}> 
-                        <react_native_1.Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 10 }]}>Select Node</react_native_1.Text>
+                      <react_native_1.View style={[styles.modalContent, { backgroundColor: resolvedTheme.surface }]}>
+                        <react_native_1.Text style={[styles.sectionTitle, { color: resolvedTheme.text, marginBottom: 10 }]}>Select Node</react_native_1.Text>
                         <react_native_1.FlatList data={nodesData.filter((node) => node.region === selectedRegion)} keyExtractor={(item) => item.id} renderItem={({ item }) => (<react_native_1.TouchableOpacity style={[
                         styles.nodeItem,
                         {
-                            backgroundColor: selectedNodeId === item.id ? theme.primary : theme.background,
-                            borderColor: theme.border,
+                            backgroundColor: selectedNodeId === item.id ? resolvedTheme.primary : resolvedTheme.background,
+                            borderColor: resolvedTheme.border,
                         },
                     ]} onPress={() => {
                         setSelectedNodeId(item.id);
                         setSelectedNodeName(`${item.name || item.id.slice(0, 8)} (${item.chainName})`);
                         setShowNodeModal(false);
                     }}>
-                              <react_native_1.Text style={{ color: selectedNodeId === item.id ? '#fff' : theme.text }}>
+                              <react_native_1.Text style={{ color: selectedNodeId === item.id ? '#fff' : resolvedTheme.text }}>
                                 {item.name || item.id.slice(0, 8)} ({item.chainName})
                               </react_native_1.Text>
-                            </react_native_1.TouchableOpacity>)} ListEmptyComponent={<react_native_1.Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 20 }}>No nodes available for this region.</react_native_1.Text>} style={{ maxHeight: 300 }}/>
-                        <react_native_1.TouchableOpacity style={[styles.closeButton, { backgroundColor: theme.primary, marginTop: 20 }]} onPress={() => setShowNodeModal(false)}>
+                            </react_native_1.TouchableOpacity>)} ListEmptyComponent={<react_native_1.Text style={{ color: resolvedTheme.textSecondary, textAlign: 'center', marginTop: 20 }}>No nodes available for this region.</react_native_1.Text>} style={{ maxHeight: 300 }}/>
+                        <react_native_1.TouchableOpacity style={[styles.closeButton, { backgroundColor: resolvedTheme.primary, marginTop: 20 }]} onPress={() => setShowNodeModal(false)}>
                           <react_native_1.Text style={{ color: '#fff' }}>Close</react_native_1.Text>
                         </react_native_1.TouchableOpacity>
                       </react_native_1.View>
@@ -292,7 +294,7 @@ PersistentKeepalive = 16`;
               <react_native_1.TouchableOpacity style={[
                 styles.createButton,
                 {
-                    backgroundColor: theme.primary,
+                    backgroundColor: resolvedTheme.primary,
                     opacity: !newClientName || !selectedRegion || !selectedNodeId || isCreatingClient ? 0.5 : 1,
                 },
             ]} onPress={createVPNClient} disabled={!newClientName || !selectedRegion || !selectedNodeId || isCreatingClient}>
@@ -301,8 +303,8 @@ PersistentKeepalive = 16`;
             </react_native_1.View>
 
             {showQrCode && configFile && (<react_native_1.View style={styles.qrCodeContainer}>
-                <react_native_qrcode_svg_1.default value={configFile} size={200} backgroundColor={theme.surface} color={theme.text}/>
-                <react_native_1.Text style={[styles.qrCodeText, { color: theme.textSecondary }]}>
+                <react_native_qrcode_svg_1.default value={configFile} size={200} backgroundColor={resolvedTheme.surface} color={resolvedTheme.text}/>
+                <react_native_1.Text style={[styles.qrCodeText, { color: resolvedTheme.textSecondary }]}>
                   Scan this QR code with the WireGuard app
                 </react_native_1.Text>
               </react_native_1.View>)}

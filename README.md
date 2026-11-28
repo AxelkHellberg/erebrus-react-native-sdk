@@ -210,7 +210,19 @@ const App = () => (
 
 ### Customizing the Theme
 
-All components accept a theme prop for customization:
+`Auth`, `ClientCreator`, `ConnectionButton`, and `StatusCard` accept a theme prop for customization:
+
+`Auth` and `ClientCreator` accept any subset of the exported `Theme` type and keep their defaults for omitted colors. `ClientCreator` also forwards `success` and `error` to its built-in authentication screen, so those status colors can be customized without supplying a full theme:
+
+```tsx
+<ClientCreator
+  apiConfig={apiConfig}
+  onClientCreated={handleClientCreated}
+  theme={{ success: '#22c55e', error: '#f87171' }}
+/>
+```
+
+A complete theme can still be shared across components:
 
 ```tsx
 const customTheme = {

@@ -1,5 +1,6 @@
 import 'react-native-get-random-values';
 import React from 'react';
+import type { Theme } from '../types/theme';
 interface ClientCreatorProps {
     apiConfig: {
         token: string;
@@ -20,14 +21,7 @@ interface ClientCreatorProps {
             persistentKeepalive?: number;
         };
     }) => void;
-    theme?: {
-        surface: string;
-        background: string;
-        text: string;
-        textSecondary: string;
-        primary: string;
-        border: string;
-    };
+    theme?: Partial<Theme>;
 }
 export declare const ClientCreator: React.FC<ClientCreatorProps>;
 export {};

@@ -20,6 +20,7 @@ import axios from 'axios';
 import { generateKeyPair } from 'curve25519-js';
 import QRCode from 'react-native-qrcode-svg';
 import { Auth } from './Auth';
+import type { Theme } from '../types/theme';
 // @ts-ignore
 
 interface Node {
@@ -56,14 +57,7 @@ interface ClientCreatorProps {
       persistentKeepalive?: number;
     };
   }) => void;
-  theme?: {
-    surface: string;
-    background: string;
-    text: string;
-    textSecondary: string;
-    primary: string;
-    border: string;
-  };
+  theme?: Partial<Theme>;
 }
 
 const REGIONS: Region[] = [
@@ -80,15 +74,17 @@ const REGIONS: Region[] = [
 export const ClientCreator: React.FC<ClientCreatorProps> = ({
   apiConfig,
   onClientCreated,
-  theme = {
+  theme,
+}) => {
+  const resolvedTheme = {
     surface: '#ffffff',
     background: '#f5f5f5',
     text: '#000000',
     textSecondary: '#6b7280',
     primary: '#6366f1',
     border: '#e5e7eb',
-  },
-}) => {
+    ...theme,
+  };
   const [newClientName, setNewClientName] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('');
   const [isCreatingClient, setIsCreatingClient] = useState(false);
@@ -246,32 +242,32 @@ PersistentKeepalive = 16`;
   }, [apiConfig, token, selectedNodeId, newClientName, nodesData, onClientCreated]);
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: resolvedTheme.background }]}>
       {!token ? (
-        <Auth onTokenReceived={handleTokenReceived} theme={theme} />
+        <Auth onTokenReceived={handleTokenReceived} theme={resolvedTheme} />
       ) : (
         <>
-          <View style={[styles.section, { backgroundColor: theme.surface }]}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Create New Client</Text>
+          <View style={[styles.section, { backgroundColor: resolvedTheme.surface }]}>
+            <Text style={[styles.sectionTitle, { color: resolvedTheme.text }]}>Create New Client</Text>
             <View style={styles.form}>
-              <Text style={[styles.label, { color: theme.text }]}>Client Name</Text>
+              <Text style={[styles.label, { color: resolvedTheme.text }]}>Client Name</Text>
               <TextInput
                 style={[
                   styles.input,
                   {
-                    backgroundColor: theme.background,
-                    borderColor: theme.border,
-                    color: theme.text,
+                    backgroundColor: resolvedTheme.background,
+                    borderColor: resolvedTheme.border,
+                    color: resolvedTheme.text,
                   },
                 ]}
                 value={newClientName}
                 onChangeText={setNewClientName}
                 placeholder="Enter client name (max 8 chars)"
-                placeholderTextColor={theme.textSecondary}
+                placeholderTextColor={resolvedTheme.textSecondary}
                 maxLength={8}
               />
 
-              <Text style={[styles.label, { color: theme.text }]}>Region</Text>
+              <Text style={[styles.label, { color: resolvedTheme.text }]}>Region</Text>
               <ScrollView horizontal style={{ marginBottom: 16 }} showsHorizontalScrollIndicator={false}>
                 {REGIONS.map((region) => (
                   <TouchableOpacity
@@ -279,8 +275,8 @@ PersistentKeepalive = 16`;
                     style={[
                       styles.regionButton,
                       {
-                        backgroundColor: selectedRegion === region.id ? theme.primary : theme.background,
-                        borderColor: theme.border,
+                        backgroundColor: selectedRegion === region.id ? resolvedTheme.primary : resolvedTheme.background,
+                        borderColor: resolvedTheme.border,
                       },
                     ]}
                     onPress={() => {
@@ -289,16 +285,16 @@ PersistentKeepalive = 16`;
                       setSelectedNodeName('');
                     }}
                   >
-                    <Text style={{ color: selectedRegion === region.id ? '#fff' : theme.text }}>
+                    <Text style={{ color: selectedRegion === region.id ? '#fff' : resolvedTheme.text }}>
                       {region.name}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
 
-              <Text style={[styles.label, { color: theme.text }]}>Node</Text>
+              <Text style={[styles.label, { color: resolvedTheme.text }]}>Node</Text>
               {isLoadingNodes ? (
-                <ActivityIndicator size="small" color={theme.primary} style={{ marginVertical: 10 }} />
+                <ActivityIndicator size="small" color={resolvedTheme.primary} style={{ marginVertical: 10 }} />
               ) : nodesError ? (
                 <Text style={{ color: '#ef4444', marginBottom: 10 }}>{nodesError}</Text>
               ) : (
@@ -307,14 +303,14 @@ PersistentKeepalive = 16`;
                     style={[
                       styles.nodeSelectButton,
                       {
-                        backgroundColor: theme.background,
-                        borderColor: theme.border,
+                        backgroundColor: resolvedTheme.background,
+                        borderColor: resolvedTheme.border,
                       },
                     ]}
                     onPress={() => setShowNodeModal(true)}
                     disabled={!selectedRegion || nodesData.filter((n) => n.region === selectedRegion).length === 0}
                   >
-                    <Text style={{ color: theme.text }}>
+                    <Text style={{ color: resolvedTheme.text }}>
                       {selectedNodeName || 'Select Node'}
                     </Text>
                   </TouchableOpacity>
@@ -325,8 +321,8 @@ PersistentKeepalive = 16`;
                     onRequestClose={() => setShowNodeModal(false)}
                   >
                     <View style={styles.modalOverlay}>
-                      <View style={[styles.modalContent, { backgroundColor: theme.surface }]}> 
-                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 10 }]}>Select Node</Text>
+                      <View style={[styles.modalContent, { backgroundColor: resolvedTheme.surface }]}>
+                        <Text style={[styles.sectionTitle, { color: resolvedTheme.text, marginBottom: 10 }]}>Select Node</Text>
                         <FlatList
                           data={nodesData.filter((node) => node.region === selectedRegion)}
                           keyExtractor={(item) => item.id}
@@ -335,8 +331,8 @@ PersistentKeepalive = 16`;
                               style={[
                                 styles.nodeItem,
                                 {
-                                  backgroundColor: selectedNodeId === item.id ? theme.primary : theme.background,
-                                  borderColor: theme.border,
+                                  backgroundColor: selectedNodeId === item.id ? resolvedTheme.primary : resolvedTheme.background,
+                                  borderColor: resolvedTheme.border,
                                 },
                               ]}
                               onPress={() => {
@@ -345,16 +341,16 @@ PersistentKeepalive = 16`;
                                 setShowNodeModal(false);
                               }}
                             >
-                              <Text style={{ color: selectedNodeId === item.id ? '#fff' : theme.text }}>
+                              <Text style={{ color: selectedNodeId === item.id ? '#fff' : resolvedTheme.text }}>
                                 {item.name || item.id.slice(0, 8)} ({item.chainName})
                               </Text>
                             </TouchableOpacity>
                           )}
-                          ListEmptyComponent={<Text style={{ color: theme.textSecondary, textAlign: 'center', marginTop: 20 }}>No nodes available for this region.</Text>}
+                          ListEmptyComponent={<Text style={{ color: resolvedTheme.textSecondary, textAlign: 'center', marginTop: 20 }}>No nodes available for this region.</Text>}
                           style={{ maxHeight: 300 }}
                         />
                         <TouchableOpacity
-                          style={[styles.closeButton, { backgroundColor: theme.primary, marginTop: 20 }]}
+                          style={[styles.closeButton, { backgroundColor: resolvedTheme.primary, marginTop: 20 }]}
                           onPress={() => setShowNodeModal(false)}
                         >
                           <Text style={{ color: '#fff' }}>Close</Text>
@@ -369,7 +365,7 @@ PersistentKeepalive = 16`;
                 style={[
                   styles.createButton,
                   {
-                    backgroundColor: theme.primary,
+                    backgroundColor: resolvedTheme.primary,
                     opacity: !newClientName || !selectedRegion || !selectedNodeId || isCreatingClient ? 0.5 : 1,
                   },
                 ]}
@@ -386,8 +382,8 @@ PersistentKeepalive = 16`;
 
             {showQrCode && configFile && (
               <View style={styles.qrCodeContainer}>
-                <QRCode value={configFile} size={200} backgroundColor={theme.surface} color={theme.text} />
-                <Text style={[styles.qrCodeText, { color: theme.textSecondary }]}>
+                <QRCode value={configFile} size={200} backgroundColor={resolvedTheme.surface} color={resolvedTheme.text} />
+                <Text style={[styles.qrCodeText, { color: resolvedTheme.textSecondary }]}>
                   Scan this QR code with the WireGuard app
                 </Text>
               </View>

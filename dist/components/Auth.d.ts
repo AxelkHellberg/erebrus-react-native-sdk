@@ -1,16 +1,8 @@
 import React from 'react';
-interface AuthTheme {
-    background: string;
-    surface: string;
-    primary: string;
-    text: string;
-    success: string;
-    error: string;
-    border: string;
-}
+import type { Theme } from '../types/theme';
 interface AuthProps {
     onTokenReceived: (token: string) => void;
-    theme?: Partial<AuthTheme>;
+    theme?: Partial<Theme>;
 }
 export declare const Auth: React.FC<AuthProps>;
 export {};

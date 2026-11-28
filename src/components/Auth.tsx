@@ -1,22 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-
-interface AuthTheme {
-  background: string;
-  surface: string;
-  primary: string;
-  text: string;
-  success: string;
-  error: string;
-  border: string;
-}
+import type { Theme } from '../types/theme';
 
 interface AuthProps {
   onTokenReceived: (token: string) => void;
-  theme?: Partial<AuthTheme>;
+  theme?: Partial<Theme>;
 }
 
-const defaultTheme: AuthTheme = {
+const defaultTheme = {
   background: '#f5f5f5',
   surface: '#ffffff',
   primary: '#007AFF',

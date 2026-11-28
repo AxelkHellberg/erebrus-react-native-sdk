@@ -5,6 +5,8 @@ export { StatusCard } from './components/StatusCard';
 export { Auth } from './components/Auth';
 
 export type { WireGuardStatus } from 'react-native-wireguard-vpn-connect';
+export type { Theme } from './types/theme';
+import type { Theme } from './types/theme';
 
 export interface VPNConfig {
   privateKey: string;
@@ -33,18 +35,6 @@ export interface Region {
   name: string;
 }
 
-export interface Theme {
-  background: string;
-  surface: string;
-  primary: string;
-  success: string;
-  error: string;
-  warning: string;
-  text: string;
-  textSecondary: string;
-  border: string;
-}
-
 export const defaultTheme: Theme = {
   background: '#f5f5f5',
   surface: '#ffffff',
@@ -55,4 +45,4 @@ export const defaultTheme: Theme = {
   text: '#000000',
   textSecondary: '#6b7280',
   border: '#e5e7eb',
-}; 
+};
